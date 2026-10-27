@@ -301,11 +301,12 @@ def build_timeline(db: Session, incident: Incident) -> list[dict[str, Any]]:
     )
     for e in events:
         subject = e.user_name or e.target_user or e.src_ip or ""
+        where = e.host or e.src_ip
         items.append(
             {
                 "at": e.event_time,
                 "kind": "event",
-                "title": f"{e.event_type} on {e.host or e.src_ip or 'unknown'}",
+                "title": f"{e.event_type} on {where}" if where else f"{e.event_type} for {e.user_name or 'unknown subject'}",
                 "detail": " · ".join(x for x in (subject, e.process_name, e.domain, e.dst_ip) if x) or None,
                 "ref_id": str(e.id),
             }
@@ -341,8 +342,10 @@ def build_timeline(db: Session, incident: Incident) -> list[dict[str, Any]]:
     created = db.execute(
         select(AuditLog).where(AuditLog.target_type == "incident", AuditLog.target_id == str(incident.id), AuditLog.action == "incident.created")
     ).scalar_one_or_none()
-    if created:
-        items.append({"at": created.created_at, "kind": "audit", "title": "Incident opened", "actor": created.actor_label, "ref_id": str(created.id)})
+    # Use the incident's own timestamp: imported or backdated incidents are opened before their audit row is written.
+    items.append(
+        {"at": incident.created_at, "kind": "audit", "title": "Incident opened", "actor": created.actor_label if created else None, "ref_id": str(created.id) if created else None}
+    )
 
     items.sort(key=lambda i: i["at"])
     return items

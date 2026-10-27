@@ -1,0 +1,136 @@
+@import "tailwindcss";
+
+/*
+ * SentinelForge IR design tokens. See docs/design-system.md.
+ * Dark-first: colour encodes severity, status and focus; structure uses neutrals.
+ */
+@theme {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, "SFMono-Regular", Consolas, monospace;
+
+  /* Surfaces (elevation increases with lightness) */
+  --color-canvas: #0b0c10;
+  --color-surface: #111319;
+  --color-raised: #161922;
+  --color-overlay: #1c202b;
+  --color-line: #232836;
+  --color-line-strong: #30364a;
+
+  /* Text */
+  --color-fg: #e7e9ef;
+  --color-muted: #a0a7b8;
+  --color-subtle: #7a8197;
+
+  /* Brand accent: actions, focus, selection */
+  --color-accent: #8b7cf6;
+  --color-accent-hover: #a094f8;
+  --color-accent-fg: #0b0c10;
+  --color-accent-soft: rgb(139 124 246 / 0.14);
+
+  /* Severity ramp (always paired with a text label) */
+  --color-sev-critical: #f0506e;
+  --color-sev-high: #f59e42;
+  --color-sev-medium: #e7c04a;
+  --color-sev-low: #5aa9e6;
+  --color-sev-info: #8a93a6;
+
+  /* Semantic states */
+  --color-ok: #4ade80;
+  --color-warn: #f59e42;
+  --color-danger: #f0506e;
+  --color-info: #5aa9e6;
+  --color-teal: #2dd4bf;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
+  --animate-fade-in: fade-in 160ms ease-out;
+  --animate-slide-up: slide-up 180ms ease-out;
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes slide-up {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+    background: var(--color-canvas);
+  }
+  body {
+    background: var(--color-canvas);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+  ::selection {
+    background: rgb(139 124 246 / 0.35);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line-strong) transparent;
+  }
+}
+
+@layer components {
+  .mono {
+    font-family: var(--font-mono);
+    font-size: 0.92em;
+    font-variant-ligatures: none;
+  }
+  .skeleton {
+    background: linear-gradient(90deg, var(--color-raised) 0%, var(--color-overlay) 50%, var(--color-raised) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s ease-in-out infinite;
+    border-radius: var(--radius-sm);
+  }
+  @keyframes shimmer {
+    from { background-position: 200% 0; }
+    to { background-position: -200% 0; }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  html, body {
+    background: #fff !important;
+    color: #111 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-doc,
+  .print-doc * {
+    color: #111 !important;
+    background: transparent !important;
+    border-color: #d4d4d8 !important;
+    box-shadow: none !important;
+  }
+  .print-doc section {
+    break-inside: avoid;
+  }
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+}

@@ -21,7 +21,10 @@ from app.models import (
     Evidence,
     Incident,
     IncidentEvent,
+    IncidentIndicator,
     IncidentNote,
+    Indicator,
+    IndicatorEnrichment,
     ResponseAction,
     User,
 )
@@ -34,6 +37,7 @@ from app.schemas import (
     IncidentOut,
     IncidentTransitionIn,
     IncidentUpdateIn,
+    IndicatorOut,
     LinkEventsIn,
     NoteIn,
     NoteOut,
@@ -341,3 +345,33 @@ def incident_report(
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
     return report
+
+
+@router.get("/{incident_id}/indicators")
+def incident_indicators(incident_id: uuid.UUID, principal: Principal = Viewer, db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+    """Indicators linked to the incident, with the latest result per provider kept separate from the analyst verdict."""
+    inc = svc.get_incident(db, principal, incident_id)
+    indicators = (
+        db.execute(
+            select(Indicator)
+            .join(IncidentIndicator, IncidentIndicator.indicator_id == Indicator.id)
+            .where(IncidentIndicator.incident_id == inc.id, Indicator.org_id == principal.org_id)
+            .order_by(Indicator.value)
+        )
+        .scalars()
+        .all()
+    )
+    out = []
+    for ind in indicators:
+        latest: dict[str, IndicatorEnrichment] = {}
+        for e in db.execute(select(IndicatorEnrichment).where(IndicatorEnrichment.indicator_id == ind.id).order_by(IndicatorEnrichment.fetched_at)).scalars():
+            latest[e.provider] = e
+        out.append(
+            {
+                "indicator": IndicatorOut.model_validate(ind),
+                "providers": [
+                    {"provider": p, "status": e.status, "reported_verdict": e.reported_verdict, "fetched_at": e.fetched_at.isoformat()} for p, e in sorted(latest.items())
+                ],
+            }
+        )
+    return out
