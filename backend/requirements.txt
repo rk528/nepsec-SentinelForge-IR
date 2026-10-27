@@ -1,0 +1,9 @@
+# Runtime dependencies (pinned). Installed by Vercel's Python runtime.
+fastapi==0.162.0
+pydantic==2.14.1
+pydantic-settings==2.16.1
+SQLAlchemy==2.1.6
+alembic==1.20.1
+psycopg[binary]==3.3.6
+argon2-cffi==25.1.0
+httpx==0.28.1

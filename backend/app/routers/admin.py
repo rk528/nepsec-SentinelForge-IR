@@ -1,0 +1,273 @@
+"""Audit search, users, data sources, ingestion, scenarios and system info."""
+
+from __future__ import annotations
+
+import uuid
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from sqlalchemy import func, or_, select, text
+from sqlalchemy.orm import Session
+
+from app import audit, ratelimit
+from app.audit import RequestContext
+from app.config import get_settings
+from app.db import get_db
+from app.deps import Admin, Analyst, Lead, Principal, Viewer, get_ctx, request_context, require_non_demo
+from app.detection.engine import run_detection
+from app.intel.providers import PROVIDERS
+from app.models import AuditLog, DataSource, Organization, User
+from app.schemas import AuditOut, DataSourceCreateIn, IngestIn, IngestOut, Page, UserCreateIn, UserRef, UserUpdateIn
+from app.security import hash_password, new_token, sha256_hex, validate_password_strength
+from app.services import demo
+from app.services.ingest import ingest_events
+from app.services.scenarios import SCENARIOS, scenario_metadata
+
+router = APIRouter(tags=["administration"])
+
+
+# --- audit ---------------------------------------------------------------------
+
+
+@router.get("/audit", response_model=Page[AuditOut])
+def search_audit(
+    principal: Principal = Lead,
+    db: Session = Depends(get_db),
+    q: str | None = Query(None, max_length=200),
+    action: str | None = Query(None, max_length=80),
+    actor: str | None = Query(None, max_length=320),
+    target_type: str | None = Query(None, max_length=40),
+    target_id: str | None = Query(None, max_length=80),
+    start: datetime | None = None,
+    end: datetime | None = None,
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=200),
+) -> Page[AuditOut]:
+    stmt = select(AuditLog).where(AuditLog.org_id == principal.org_id)
+    if q:
+        like = f"%{q.strip()}%"
+        stmt = stmt.where(or_(AuditLog.action.ilike(like), AuditLog.actor_label.ilike(like), AuditLog.target_id.ilike(like)))
+    if action:
+        stmt = stmt.where(AuditLog.action.like(action.replace("*", "%")))
+    if actor:
+        stmt = stmt.where(AuditLog.actor_label.ilike(f"%{actor}%"))
+    if target_type:
+        stmt = stmt.where(AuditLog.target_type == target_type)
+    if target_id:
+        stmt = stmt.where(AuditLog.target_id == target_id)
+    if start:
+        stmt = stmt.where(AuditLog.created_at >= start)
+    if end:
+        stmt = stmt.where(AuditLog.created_at <= end)
+    total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
+    rows = db.execute(stmt.order_by(AuditLog.created_at.desc()).offset((page - 1) * page_size).limit(page_size)).scalars()
+    return Page(items=[AuditOut.model_validate(r) for r in rows], total=total, page=page, page_size=page_size)
+
+
+# --- users -----------------------------------------------------------------------
+
+
+@router.get("/users", response_model=list[UserRef])
+def list_users(principal: Principal = Viewer, db: Session = Depends(get_db)) -> list[UserRef]:
+    rows = db.execute(select(User).where(User.org_id == principal.org_id, User.is_active.is_(True)).order_by(User.display_name)).scalars()
+    return [UserRef.model_validate(u) for u in rows]
+
+
+@router.get("/admin/users")
+def admin_list_users(principal: Principal = Admin, db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+    rows = db.execute(select(User).where(User.org_id == principal.org_id).order_by(User.created_at)).scalars()
+    return [
+        {
+            "id": str(u.id),
+            "email": u.email,
+            "display_name": u.display_name,
+            "role": u.role,
+            "is_active": u.is_active,
+            "is_demo": u.is_demo,
+            "created_at": u.created_at.isoformat(),
+            "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
+        }
+        for u in rows
+    ]
+
+
+@router.post("/admin/users", status_code=201)
+def create_user(
+    body: UserCreateIn, principal: Principal = Admin, _: Principal = Depends(require_non_demo), ctx: RequestContext = Depends(get_ctx), db: Session = Depends(get_db)
+) -> dict[str, str]:
+    try:
+        validate_password_strength(body.password)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    if db.execute(select(User.id).where(func.lower(User.email) == body.email.lower())).scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="A user with that email already exists")
+    user = User(org_id=principal.org_id, email=body.email.lower(), display_name=body.display_name, role=body.role, password_hash=hash_password(body.password))
+    db.add(user)
+    db.flush()
+    audit.record(db, ctx, "user.created", target_type="user", target_id=user.id, details={"email": user.email, "role": user.role})
+    db.commit()
+    return {"id": str(user.id)}
+
+
+@router.patch("/admin/users/{user_id}")
+def update_user(
+    user_id: uuid.UUID,
+    body: UserUpdateIn,
+    principal: Principal = Admin,
+    _: Principal = Depends(require_non_demo),
+    ctx: RequestContext = Depends(get_ctx),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    user = db.execute(select(User).where(User.id == user_id, User.org_id == principal.org_id)).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.id == principal.user_id and (body.role not in (None, "admin") or body.is_active is False):
+        raise HTTPException(status_code=422, detail="You cannot demote or deactivate yourself")
+    changes = {}
+    if body.role and body.role != user.role:
+        changes["role"] = {"from": user.role, "to": body.role}
+        user.role = body.role
+    if body.is_active is not None and body.is_active != user.is_active:
+        changes["is_active"] = {"from": user.is_active, "to": body.is_active}
+        user.is_active = body.is_active
+        if not body.is_active:
+            db.execute(text("UPDATE user_sessions SET revoked_at = now() WHERE user_id = :u AND revoked_at IS NULL"), {"u": user.id})
+    audit.record(db, ctx, "user.updated", target_type="user", target_id=user.id, details={"changes": changes})
+    db.commit()
+    return {"id": str(user.id), "role": user.role, "is_active": user.is_active}
+
+
+# --- data sources and ingestion -------------------------------------------------------
+
+
+def _source_dict(s: DataSource) -> dict[str, Any]:
+    return {
+        "id": str(s.id),
+        "name": s.name,
+        "source_type": s.source_type,
+        "description": s.description,
+        "is_enabled": s.is_enabled,
+        "is_synthetic": s.is_synthetic,
+        "event_count": s.event_count,
+        "last_event_at": s.last_event_at.isoformat() if s.last_event_at else None,
+        "has_ingest_key": s.ingest_key_hash is not None,
+        "ingest_key_prefix": s.ingest_key_prefix,
+        "created_at": s.created_at.isoformat(),
+    }
+
+
+@router.get("/data-sources")
+def list_sources(principal: Principal = Viewer, db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+    rows = db.execute(select(DataSource).where(DataSource.org_id == principal.org_id).order_by(DataSource.name)).scalars()
+    return [_source_dict(s) for s in rows]
+
+
+@router.post("/data-sources", status_code=201)
+def create_source(
+    body: DataSourceCreateIn, principal: Principal = Admin, _: Principal = Depends(require_non_demo), ctx: RequestContext = Depends(get_ctx), db: Session = Depends(get_db)
+) -> dict[str, Any]:
+    if db.execute(select(DataSource.id).where(DataSource.org_id == principal.org_id, DataSource.name == body.name)).scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="A data source with that name already exists")
+    key = "sfk_" + new_token(32)
+    src = DataSource(
+        org_id=principal.org_id, name=body.name, source_type=body.source_type, description=body.description, ingest_key_hash=sha256_hex(key), ingest_key_prefix=key[:10]
+    )
+    db.add(src)
+    db.flush()
+    audit.record(db, ctx, "data_source.created", target_type="data_source", target_id=src.id, details={"name": src.name, "type": src.source_type})
+    db.commit()
+    # The key is returned exactly once; only its hash is stored.
+    return {**_source_dict(src), "ingest_key": key}
+
+
+@router.post("/data-sources/{source_id}/rotate-key")
+def rotate_key(
+    source_id: uuid.UUID, principal: Principal = Admin, _: Principal = Depends(require_non_demo), ctx: RequestContext = Depends(get_ctx), db: Session = Depends(get_db)
+) -> dict[str, Any]:
+    src = db.execute(select(DataSource).where(DataSource.id == source_id, DataSource.org_id == principal.org_id)).scalar_one_or_none()
+    if src is None:
+        raise HTTPException(status_code=404, detail="Data source not found")
+    key = "sfk_" + new_token(32)
+    src.ingest_key_hash, src.ingest_key_prefix = sha256_hex(key), key[:10]
+    audit.record(db, ctx, "data_source.key_rotated", target_type="data_source", target_id=src.id)
+    db.commit()
+    return {**_source_dict(src), "ingest_key": key}
+
+
+@router.post("/ingest/events", response_model=IngestOut, tags=["ingestion"])
+def ingest(body: IngestIn, request: Request, db: Session = Depends(get_db)) -> IngestOut:
+    """Machine-to-machine ingestion, authenticated by a per-source key (``Authorization: Bearer sfk_...``).
+
+    This endpoint is separate from the analyst API: it does not accept session cookies.
+    """
+    auth = request.headers.get("authorization", "")
+    if not auth.lower().startswith("bearer ") or not auth[7:].startswith("sfk_") or len(auth) > 200:
+        raise HTTPException(status_code=401, detail="Missing or invalid ingest key", headers={"WWW-Authenticate": "Bearer"})
+    src = db.execute(select(DataSource).where(DataSource.ingest_key_hash == sha256_hex(auth[7:].strip()))).scalar_one_or_none()
+    if src is None or not src.is_enabled:
+        raise HTTPException(status_code=401, detail="Missing or invalid ingest key", headers={"WWW-Authenticate": "Bearer"})
+    s = get_settings()
+    ratelimit.hit(db, f"ingest:{src.id}", s.ingest_rate_limit, s.ingest_rate_window_seconds)
+
+    result = ingest_events(db, src.org_id, src, body.events)
+    ctx = RequestContext(org_id=src.org_id, user_id=None, actor_label=f"ingest:{src.name}", ip=request_context(request).ip, request_id=getattr(request.state, "request_id", None))
+    created = updated = 0
+    if body.run_detection and result.inserted and result.earliest:
+        summary = run_detection(db, src.org_id, since=result.earliest, ctx=ctx)
+        created, updated = summary.alerts_created, summary.alerts_updated
+    audit.record(db, ctx, "ingest.batch", target_type="data_source", target_id=src.id, details={"received": result.received, "inserted": result.inserted})
+    db.commit()
+    return IngestOut(received=result.received, inserted=result.inserted, duplicates=result.received - result.inserted, alerts_created=created, alerts_updated=updated)
+
+
+# --- scenarios ------------------------------------------------------------------------
+
+
+@router.get("/scenarios")
+def list_scenarios(principal: Principal = Viewer) -> list[dict[str, Any]]:
+    return scenario_metadata()
+
+
+@router.post("/scenarios/{scenario_id}/run")
+def run_scenario(scenario_id: str, principal: Principal = Analyst, ctx: RequestContext = Depends(get_ctx), db: Session = Depends(get_db)) -> dict[str, Any]:
+    if scenario_id not in SCENARIOS:
+        raise HTTPException(status_code=404, detail="Scenario not found")
+    org = db.get(Organization, principal.org_id)
+    # Synthetic data is only injected into demo workspaces, or by an admin who explicitly chooses to.
+    if not (org and org.is_demo) and not principal.can("admin"):
+        raise HTTPException(status_code=403, detail="Scenarios can only be run in a demo workspace or by an admin")
+    ratelimit.hit(db, f"scenario:{principal.org_id}", 20, 3600)
+    # Start slightly in the past so correlation windows complete before "now".
+    start = datetime.now(UTC).replace(microsecond=0) - timedelta(minutes=30)
+    result = demo.run_scenario(db, ctx, principal.org_id, scenario_id, start, variant=f"-{new_token(3).lower()}")
+    db.commit()
+    return result
+
+
+# --- settings / system ------------------------------------------------------------------
+
+
+@router.get("/system")
+def system_info(principal: Principal = Viewer, db: Session = Depends(get_db)) -> dict[str, Any]:
+    s = get_settings()
+    try:
+        revision = db.execute(text("SELECT version_num FROM alembic_version")).scalar_one_or_none()
+    except Exception:  # noqa: BLE001
+        db.rollback()
+        revision = None
+    org = db.get(Organization, principal.org_id)
+    return {
+        "version": s.app_version,
+        "environment": s.app_env,
+        "demo_mode": s.demo_mode,
+        "migration_revision": revision,
+        "organization": {"name": org.name if org else None, "is_demo": bool(org and org.is_demo)},
+        "integrations": [{"name": p.label, "configured": p.configured()} for p in PROVIDERS],
+        "session": {"ttl_hours": s.session_ttl_hours, "idle_minutes": s.session_idle_minutes},
+        "limits": {
+            "max_body_bytes": s.max_body_bytes,
+            "max_ingest_body_bytes": s.max_ingest_body_bytes,
+            "login_rate_limit": f"{s.login_rate_limit}/{s.login_rate_window_seconds}s",
+        },
+    }
