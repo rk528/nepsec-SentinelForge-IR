@@ -10,6 +10,8 @@ action is simulated.**
 
 ![Overview](docs/screenshots/dashboard.png)
 
+**Live demo:** https://sentinelforge.kuinkel.com (choose *Explore the synthetic demo*).
+
 ## What it does
 
 | Area | Highlights |

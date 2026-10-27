@@ -10,7 +10,13 @@ Current state (27 October 2026):
 | Neon project `sentinelforge-ir` (us-east-1), branches `production` and `development` | Created |
 | Schema migration `0001` on `production` | Applied (via Neon SQL, equivalent to `alembic upgrade head`) |
 | Demo data | Seeds itself on the first demo sign-in when `DEMO_MODE=true` |
-| Vercel projects | **Not created yet**: the Vercel connection needs access to the team (see below) |
+| Vercel project `sentinelforge-ir` (frontend) | Live at **https://sentinelforge.kuinkel.com** |
+| Vercel project `sentinelforge-api` (backend, region `iad1`) | Live at **https://sentinelforge-api.kuinkel.com** |
+| DNS | Cloudflare CNAMEs (DNS only) for both subdomains; certificates issued by Vercel |
+| Live verification | 24/24 smoke checks passed (health, auth, CSRF, demo workflow, self-test of all 7 rules); Microsoft ingestion verified with synthetic records (alerts raised, re-send de-duplicated, bad key rejected) |
+
+Custom domains are excluded from the team's Vercel Authentication, so both subdomains are
+public while `*.vercel.app` deployment URLs still require a Vercel sign-in.
 
 ## 1. Neon
 
