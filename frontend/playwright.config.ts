@@ -13,7 +13,7 @@ export default defineConfig({
     baseURL: process.env.BASE_URL ?? "http://127.0.0.1:3000",
     channel: process.env.PW_CHANNEL ?? "chrome",
     viewport: { width: 1440, height: 900 },
-    colorScheme: "dark",
+    colorScheme: process.env.PW_COLOR_SCHEME === "light" ? "light" : "dark",
     trace: "retain-on-failure",
   },
 });

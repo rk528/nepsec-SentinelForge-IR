@@ -365,18 +365,19 @@ class PhishingLinkFollowed(Rule):
 
 class MicrosoftSecurityAlert(Rule):
     id = "SF-EXT-001"
-    name = "Microsoft Defender / Entra ID Protection alert"
-    description = "A medium or high severity alert raised by Microsoft Defender XDR, Defender for Cloud or Entra ID Protection, forwarded through the Graph security API."
+    name = "Security product alert (Microsoft Defender, FortiGate)"
+    description = "A medium or high severity alert raised by Microsoft Defender XDR, Defender for Cloud, Entra ID Protection, or FortiGate IPS, antivirus and anomaly detection."
     severity = "medium"
     confidence = "medium"
     rationale = (
-        "Microsoft's own detections see telemetry this platform does not, such as endpoint memory, mailbox and identity risk signals. "
+        "Vendor detections see telemetry this platform does not, such as endpoint memory, mailbox and identity risk signals or packet payloads inspected by the firewall. "
         "Promoting them into the same queue lets analysts correlate them with local detections and run the incident workflow on them."
     )
-    required_telemetry = ["security.alert from the Microsoft Graph security API (format defender-alert), severity in outcome"]
+    required_telemetry = ["security.alert from the Microsoft Graph security API or FortiGate UTM logs, severity in outcome"]
     false_positives = [
-        "Whatever Microsoft's detection itself gets wrong; this rule adds no judgement of its own.",
-        "Alerts already resolved in the Microsoft portal before they were forwarded.",
+        "Whatever the vendor's detection itself gets wrong; this rule adds no judgement of its own.",
+        "Alerts already resolved in the vendor console before they were forwarded.",
+        "IPS signatures that match scanning traffic which the firewall already blocked.",
     ]
     # Each alert carries its own techniques (raw.mitreTechniques); the rule has none of its own.
     attack_techniques: list[str] = []
@@ -397,7 +398,7 @@ class MicrosoftSecurityAlert(Rule):
                     # Re-forwarding the same alert (e.g. after a status change) updates one alert, not several.
                     dedup_key=f"{self.id}:{_short_hash(f'{title}|{lower(e.host)}|{lower(e.user_name)}')}:{e.event_time.strftime('%Y%m%d')}",
                     title=title[:300],
-                    description=f"Forwarded from Microsoft for {e.host or e.user_name or 'an unnamed entity'}. Open the Microsoft portal link in the event for full context.",
+                    description=f"Forwarded from a security product for {e.host or e.user_name or e.src_ip or 'an unnamed entity'}. See the event for the vendor's details.",
                     event_ids=[e.id],
                     first_seen=e.event_time,
                     last_seen=e.event_time,

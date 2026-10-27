@@ -1,7 +1,7 @@
-import { clsx as cn } from "clsx";
 import { FlaskConical } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { cn } from "@/lib/cn";
 import type { AlertStatus, Confidence, IncidentStatus, Severity, Verdict } from "@/lib/types";
 
 const SEVERITY: Record<Severity, { label: string; cls: string; dot: string }> = {

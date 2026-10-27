@@ -474,5 +474,7 @@ class UserUpdateIn(BaseModel):
 
 class DataSourceCreateIn(BaseModel):
     name: str = Field(min_length=2, max_length=120)
-    source_type: Literal["windows_security", "sysmon", "linux_auditd", "firewall", "dns", "proxy", "email_gateway", "edr", "microsoft_entra", "microsoft_defender", "custom"]
+    source_type: Literal[
+        "windows_security", "sysmon", "linux_auditd", "firewall", "dns", "proxy", "email_gateway", "edr", "microsoft_entra", "microsoft_defender", "fortigate", "custom"
+    ]
     description: str | None = Field(default=None, max_length=2000)

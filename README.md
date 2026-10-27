@@ -16,7 +16,7 @@ action is simulated.**
 
 | Area | Highlights |
 |---|---|
-| Ingestion | Authenticated per-source API keys, strict validation, idempotent fingerprints, 1 MiB / 500-event batches; native Microsoft formats (Entra ID sign-in and audit logs, Defender XDR alerts, Windows Security/Sysmon events) with ready-made shippers ([guide](docs/connectors-microsoft.md)) |
+| Ingestion | Authenticated per-source API keys, strict validation, idempotent fingerprints, 1 MiB / 500-event batches; native Microsoft formats (Entra ID sign-in and audit logs, Defender XDR alerts, Windows Security/Sysmon events) and FortiGate firewall logs, with ready-made shippers ([Microsoft](docs/connectors-microsoft.md), [FortiGate](docs/connectors-fortigate.md)) |
 | Detection | Seven documented rules (brute force, LOLBins, privileged account creation, log tampering, suspicious egress, phishing click, forwarded Microsoft alerts) with labelled fixtures and an honest self-test (TP/FP/TN/FN, precision, recall, known misses) |
 | Alert triage | Dedup-safe alerts with rule rationale, false-positive notes and matching events; acknowledge, close with disposition, or escalate |
 | Incidents | Lifecycle state machine (New → Open → Investigating → Contained → Resolved → Closed, lead-only reopen), optimistic concurrency, merged timeline, append-only notes, hashed evidence with provenance |
@@ -78,7 +78,7 @@ extensions are skipped automatically on Windows for the same reason.
 ## Tests
 
 ```bash
-cd backend  && python -m pytest                    # 105 tests against real PostgreSQL
+cd backend  && python -m pytest                    # 114 tests against real PostgreSQL
 cd frontend && npm run lint && npm run typecheck && npm test   # 23 unit/component tests
 cd frontend && npm run test:e2e                    # 10 Playwright tests incl. axe WCAG scans
 ```
@@ -112,6 +112,7 @@ A five-minute walkthrough and three case studies: [docs/portfolio-demo.md](docs/
 | [incident-runbooks.md](docs/incident-runbooks.md) | Rule-aligned response procedures |
 | [testing.md](docs/testing.md) | Test suites and recorded results |
 | [connectors-microsoft.md](docs/connectors-microsoft.md) | Sending Entra ID, Defender and Windows logs |
+| [connectors-fortigate.md](docs/connectors-fortigate.md) | FortiGate syslog relay and FortiOS configuration |
 | [deployment.md](docs/deployment.md) | Vercel + Neon setup, migrations, rollback |
 | [free-tier-limitations.md](docs/free-tier-limitations.md) | Verified limits and implications |
 | [portfolio-demo.md](docs/portfolio-demo.md) | Walkthrough and case studies |
@@ -122,7 +123,7 @@ A five-minute walkthrough and three case studies: [docs/portfolio-demo.md](docs/
 
 **Planned / not implemented:** MFA or SSO; real (non-simulated) containment integrations; Sigma
 rule conversion; frequency-based beacon detection; background job queue for large ingests;
-scheduled demo reset; light theme.
+scheduled demo reset.
 
 ## Limitations
 

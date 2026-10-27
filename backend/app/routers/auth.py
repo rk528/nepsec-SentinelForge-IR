@@ -71,7 +71,7 @@ def login(body: LoginIn, request: Request, response: Response, db: Session = Dep
     user = db.execute(select(User).where(func.lower(User.email) == body.email.lower())).scalar_one_or_none()
     ok = verify_password(body.password, user.password_hash if user else None)
     ctx = request_context(request)
-    if not ok or user is None or not user.is_active or user.is_demo:
+    if not ok or user is None or not user.is_active or user.is_demo or user.removed_at is not None:
         audit.record(db, ctx, "auth.login_failed", target_type="user", details={"email": body.email.lower()}, org_id=user.org_id if user else None)
         db.commit()
         # Same message whether the account exists or not.

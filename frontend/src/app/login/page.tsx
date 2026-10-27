@@ -9,6 +9,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { LogoMark } from "@/components/shell/logo";
+import { ThemeToggle } from "@/components/shell/theme-toggle";
 import { Button, Field, Input } from "@/components/ui/primitives";
 import { ApiError, api } from "@/lib/api";
 import { safeNext } from "@/lib/navigation";
@@ -127,6 +128,7 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <main className="flex min-h-dvh flex-col items-center justify-center bg-shell px-4 py-12 md:px-10">
+      <ThemeToggle className="fixed top-4 right-4" />
       <Suspense>
         <LoginForm />
       </Suspense>

@@ -60,12 +60,16 @@ Roles: `viewer` < `analyst` < `lead` < `admin`.
 | GET | `/audit` | lead | Search by action (supports `*`), actor, target, time |
 | GET | `/users` | viewer | Active users for assignment |
 | GET/POST/PATCH | `/admin/users[/{id}]` | admin (non-demo for writes) | |
+| DELETE | `/admin/users/{id}` | admin, non-demo | Remove an account: sessions revoked, cannot sign in, hidden, email freed; history kept. Not yourself or the last admin |
 | GET/POST | `/data-sources` | viewer / admin | Creation returns the ingest key once |
-| POST | `/data-sources/{id}/rotate-key` | admin | |
+| POST | `/data-sources/{id}/rotate-key` | admin | Issue a new key (the old one stops working) |
+| POST | `/data-sources/{id}/revoke-key` | admin | Invalidate the key; events kept |
+| DELETE | `/data-sources/{id}` | admin | Only for sources with no stored events (409 otherwise) |
 | GET | `/scenarios` | viewer | |
 | POST | `/scenarios/{id}/run` | analyst in demo org, else admin | Injects synthetic events |
 | GET | `/system` | viewer | Version, migration revision, integration status (no secrets) |
 | POST | `/ingest/events` | ingest key | See below |
+| POST | `/ingest/fortigate` | ingest key | FortiGate syslog lines from the relay (`{"logs": [...]}`); see [connectors-fortigate.md](connectors-fortigate.md) |
 | POST | `/ingest/microsoft/{format}` | ingest key | Native Microsoft JSON: `entra-signin`, `entra-audit`, `defender-alert`, `windows-event`; see [connectors-microsoft.md](connectors-microsoft.md) |
 
 ## Ingestion

@@ -59,10 +59,10 @@ def env(name: str) -> str:
 
 
 def request(url: str, *, data: bytes | None = None, headers: dict[str, str] | None = None, method: str | None = None) -> Any:
-    req = urllib.request.Request(url, data=data, headers={"User-Agent": USER_AGENT, **(headers or {})}, method=method)
+    req = urllib.request.Request(url, data=data, headers={"User-Agent": USER_AGENT, **(headers or {})}, method=method)  # noqa: S310 - fixed https endpoints
     for attempt in range(5):
         try:
-            with urllib.request.urlopen(req, timeout=60) as resp:
+            with urllib.request.urlopen(req, timeout=60) as resp:  # noqa: S310 - fixed https endpoints
                 body = resp.read()
                 return json.loads(body) if body else None
         except urllib.error.HTTPError as exc:
@@ -82,9 +82,7 @@ def request(url: str, *, data: bytes | None = None, headers: dict[str, str] | No
 
 
 def graph_token(tenant: str, client_id: str, secret: str) -> str:
-    form = urllib.parse.urlencode(
-        {"client_id": client_id, "client_secret": secret, "grant_type": "client_credentials", "scope": "https://graph.microsoft.com/.default"}
-    ).encode()
+    form = urllib.parse.urlencode({"client_id": client_id, "client_secret": secret, "grant_type": "client_credentials", "scope": "https://graph.microsoft.com/.default"}).encode()
     body = request(f"https://login.microsoftonline.com/{urllib.parse.quote(tenant)}/oauth2/v2.0/token", data=form, headers={"Content-Type": "application/x-www-form-urlencoded"})
     return body["access_token"]
 

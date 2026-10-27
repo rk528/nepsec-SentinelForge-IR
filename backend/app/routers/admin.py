@@ -6,19 +6,20 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, Response
 from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import Session
 
 from app import audit, ratelimit
 from app.audit import RequestContext
 from app.config import get_settings
+from app.connectors.fortigate import map_fortigate_payload
 from app.connectors.microsoft import map_records
 from app.db import get_db
 from app.deps import Admin, Analyst, Lead, Principal, Viewer, get_ctx, request_context, require_non_demo
 from app.detection.engine import run_detection
 from app.intel.providers import PROVIDERS
-from app.models import AuditLog, DataSource, Organization, User
+from app.models import AuditLog, DataSource, Event, Organization, User
 from app.schemas import AuditOut, DataSourceCreateIn, EventIn, IngestIn, IngestOut, Page, UserCreateIn, UserRef, UserUpdateIn
 from app.security import hash_password, new_token, sha256_hex, validate_password_strength
 from app.services import demo
@@ -77,7 +78,7 @@ def list_users(principal: Principal = Viewer, db: Session = Depends(get_db)) -> 
 
 @router.get("/admin/users")
 def admin_list_users(principal: Principal = Admin, db: Session = Depends(get_db)) -> list[dict[str, Any]]:
-    rows = db.execute(select(User).where(User.org_id == principal.org_id).order_by(User.created_at)).scalars()
+    rows = db.execute(select(User).where(User.org_id == principal.org_id, User.removed_at.is_(None)).order_by(User.created_at)).scalars()
     return [
         {
             "id": str(u.id),
@@ -120,7 +121,7 @@ def update_user(
     ctx: RequestContext = Depends(get_ctx),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
-    user = db.execute(select(User).where(User.id == user_id, User.org_id == principal.org_id)).scalar_one_or_none()
+    user = db.execute(select(User).where(User.id == user_id, User.org_id == principal.org_id, User.removed_at.is_(None))).scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     if user.id == principal.user_id and (body.role not in (None, "admin") or body.is_active is False):
@@ -137,6 +138,39 @@ def update_user(
     audit.record(db, ctx, "user.updated", target_type="user", target_id=user.id, details={"changes": changes})
     db.commit()
     return {"id": str(user.id), "role": user.role, "is_active": user.is_active}
+
+
+@router.delete("/admin/users/{user_id}", status_code=204)
+def remove_user(
+    user_id: uuid.UUID, principal: Principal = Admin, _: Principal = Depends(require_non_demo), ctx: RequestContext = Depends(get_ctx), db: Session = Depends(get_db)
+) -> Response:
+    """Remove an account: it can no longer sign in, disappears from user lists, and its email is freed.
+
+    The row is kept (anonymised) because the audit log is append-only and incidents,
+    notes and approvals keep pointing at who did what; the audit entry records the email.
+    """
+    user = db.execute(select(User).where(User.id == user_id, User.org_id == principal.org_id, User.removed_at.is_(None))).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.id == principal.user_id:
+        raise HTTPException(status_code=422, detail="You cannot remove your own account")
+    if (
+        user.role == "admin"
+        and not db.execute(
+            select(User.id).where(User.org_id == principal.org_id, User.role == "admin", User.is_active.is_(True), User.removed_at.is_(None), User.id != user.id).limit(1)
+        ).first()
+    ):
+        raise HTTPException(status_code=422, detail="The organisation must keep at least one active administrator")
+    email, name = user.email, user.display_name
+    db.execute(text("UPDATE user_sessions SET revoked_at = now() WHERE user_id = :u AND revoked_at IS NULL"), {"u": user.id})
+    user.is_active = False
+    user.password_hash = None
+    user.removed_at = datetime.now(UTC)
+    user.email = f"removed-{user.id.hex}@removed.invalid"
+    user.display_name = f"{name} (removed)"[:120]
+    audit.record(db, ctx, "user.removed", target_type="user", target_id=user.id, details={"email": email, "display_name": name})
+    db.commit()
+    return Response(status_code=204)
 
 
 # --- data sources and ingestion -------------------------------------------------------
@@ -196,6 +230,36 @@ def rotate_key(
     return {**_source_dict(src), "ingest_key": key}
 
 
+@router.post("/data-sources/{source_id}/revoke-key")
+def revoke_key(
+    source_id: uuid.UUID, principal: Principal = Admin, _: Principal = Depends(require_non_demo), ctx: RequestContext = Depends(get_ctx), db: Session = Depends(get_db)
+) -> dict[str, Any]:
+    """Invalidate the source's ingest key immediately. History is kept; rotate to issue a new key."""
+    src = db.execute(select(DataSource).where(DataSource.id == source_id, DataSource.org_id == principal.org_id)).scalar_one_or_none()
+    if src is None:
+        raise HTTPException(status_code=404, detail="Data source not found")
+    src.ingest_key_hash = src.ingest_key_prefix = None
+    audit.record(db, ctx, "data_source.key_revoked", target_type="data_source", target_id=src.id)
+    db.commit()
+    return _source_dict(src)
+
+
+@router.delete("/data-sources/{source_id}", status_code=204)
+def delete_source(
+    source_id: uuid.UUID, principal: Principal = Admin, _: Principal = Depends(require_non_demo), ctx: RequestContext = Depends(get_ctx), db: Session = Depends(get_db)
+) -> Response:
+    """Delete a source that never received events. Sources with events keep their evidence; revoke the key instead."""
+    src = db.execute(select(DataSource).where(DataSource.id == source_id, DataSource.org_id == principal.org_id)).scalar_one_or_none()
+    if src is None:
+        raise HTTPException(status_code=404, detail="Data source not found")
+    if db.execute(select(Event.id).where(Event.data_source_id == src.id).limit(1)).first():
+        raise HTTPException(status_code=409, detail="This source has stored events that may be evidence. Revoke its key to stop ingestion instead.")
+    audit.record(db, ctx, "data_source.deleted", target_type="data_source", target_id=src.id, details={"name": src.name})
+    db.delete(src)
+    db.commit()
+    return Response(status_code=204)
+
+
 @router.post("/ingest/events", response_model=IngestOut, tags=["ingestion"])
 def ingest(body: IngestIn, request: Request, db: Session = Depends(get_db)) -> IngestOut:
     """Machine-to-machine ingestion, authenticated by a per-source key (``Authorization: Bearer sfk_...``).
@@ -228,6 +292,22 @@ def ingest_microsoft(
     if len(events) + skipped > MAX_VENDOR_RECORDS:
         raise HTTPException(status_code=413, detail=f"At most {MAX_VENDOR_RECORDS} records per request")
     out = _ingest(request, db, src, events, run=run_detection, details={"format": fmt, "skipped": skipped})
+    out.skipped = skipped
+    return out
+
+
+@router.post("/ingest/fortigate", response_model=IngestOut, tags=["ingestion"])
+def ingest_fortigate(request: Request, payload: Any = Body(...), db: Session = Depends(get_db), run_detection: bool = True) -> IngestOut:
+    """FortiGate logs as sent by the syslog relay: ``{"logs": [line, ...]}``.
+
+    Lines may be FortiOS ``key=value`` or JSON, with or without a syslog header.
+    Same ingest key as ``/ingest/events``; unmapped lines are counted as skipped.
+    """
+    src = _ingest_source(request, db)
+    events, skipped = map_fortigate_payload(payload)
+    if len(events) + skipped > MAX_VENDOR_RECORDS:
+        raise HTTPException(status_code=413, detail=f"At most {MAX_VENDOR_RECORDS} records per request")
+    out = _ingest(request, db, src, events, run=run_detection, details={"format": "fortigate", "skipped": skipped})
     out.skipped = skipped
     return out
 

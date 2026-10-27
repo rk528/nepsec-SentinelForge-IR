@@ -1,11 +1,12 @@
 "use client";
 
-import { clsx } from "clsx";
 import { AlertTriangle, Inbox, Loader2, RotateCw } from "lucide-react";
 import Link from "next/link";
 import { forwardRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 
-export const cn = clsx;
+import { cn } from "@/lib/cn";
+
+export { cn };
 
 // --- Button -------------------------------------------------------------------------
 

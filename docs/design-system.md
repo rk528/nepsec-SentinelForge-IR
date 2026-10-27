@@ -24,6 +24,7 @@ come from the research in [ui-research.md](ui-research.md). Tokens live in
 
 | Token | Value | Use |
 |---|---|---|
+| Themes | dark (default) and light | `data-theme` on `<html>`, set before paint from the saved choice or the OS; toggle in the header and on the login page. Light uses shadcn zinc light with darker severity shades for 4.5:1 |
 | `shell` | `#131316` | Sidebar and page background around the inset main area |
 | `canvas` / `surface` / `raised` / `overlay` | `#09090b` / `#131316` / `#1b1b1f` / `#222227` | Inset main area, cards, hover/selected, menus |
 | `line` / `line-strong` | `#232328` / `#2f2f36` | Borders |

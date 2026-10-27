@@ -16,6 +16,7 @@ import { SeverityBadge } from "../ui/badges";
 import { Kbd, Spinner, cn } from "../ui/primitives";
 import { Logo } from "./logo";
 import { NAV } from "./nav";
+import { ThemeToggle } from "./theme-toggle";
 
 function Sidebar({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
   const pathname = usePathname();
@@ -23,7 +24,7 @@ function Sidebar({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: (
     <nav aria-label="Primary" className="flex-1 space-y-2 overflow-y-auto px-2 py-2">
       {NAV.map((group) => (
         <div key={group.section}>
-          {!collapsed && <p className="flex h-8 items-center px-2 text-xs font-medium text-muted/80">{group.section}</p>}
+          {!collapsed && <p className="flex h-8 items-center px-2 text-xs font-medium text-muted">{group.section}</p>}
           <ul className="space-y-0.5">
             {group.items.map((item) => {
               const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -299,8 +300,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Kbd>Ctrl K</Kbd>
             </span>
           </button>
-          <div className="ml-auto flex items-center gap-3">
-            {me && <span className="hidden max-w-56 truncate text-sm text-muted xl:inline">{me.org_name}</span>}
+          <div className="ml-auto flex items-center gap-2">
+            {me && <span className="mr-1 hidden max-w-56 truncate text-sm text-muted xl:inline">{me.org_name}</span>}
+            <ThemeToggle />
             <div className="md:hidden">
               <UserMenu variant="header" />
             </div>

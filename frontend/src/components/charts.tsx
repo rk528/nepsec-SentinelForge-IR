@@ -51,8 +51,8 @@ export function SeverityTrendChart({ data, label, emptyText }: { data: Row[]; la
             <CartesianGrid vertical={false} stroke="#232836" />
             <XAxis dataKey="date" tickFormatter={formatDay} tick={{ fill: "#858ca2", fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={16} />
             <YAxis allowDecimals={false} tick={{ fill: "#858ca2", fontSize: 11 }} axisLine={false} tickLine={false} width={40} />
-            <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
-            <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: 11, color: "#a0a7b8", paddingTop: 8 }} />
+            <Tooltip content={<ChartTooltip />} cursor={{ fill: "color-mix(in srgb, var(--color-fg) 5%, transparent)" }} />
+            <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: 12, color: "var(--color-muted)", paddingTop: 8 }} />
             {present.map((s, i) => (
               <Bar key={s} dataKey={s} name={LABEL[s]} stackId="sev" fill={SEVERITY_COLOR[s]} radius={i === present.length - 1 ? [2, 2, 0, 0] : 0} isAnimationActive={false} />
             ))}

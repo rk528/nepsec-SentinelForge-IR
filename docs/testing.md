@@ -11,7 +11,7 @@ PostgreSQL 16 with [pgserver](https://pypi.org/project/pgserver/); CI uses a `po
 service container. Migrations are applied with Alembic at session start, so the migration
 itself is tested.
 
-**Result: 105 passed.**
+**Result: 114 passed.**
 
 | File | Covers |
 |---|---|
@@ -20,6 +20,7 @@ itself is tested.
 | `test_security.py` | Auth required; generic login errors; password not echoed; login rate limit; CSRF; logout revocation; idle expiry; cookie flags; viewer/admin restrictions; ingest key; cross-tenant reads and writes (IDOR); assignee scoping; malicious payloads; Markdown escaping; validation; body size; append-only audit |
 | `test_response.py` | All playbooks; idempotency; separation of duties; internal IP refusal; closure blocked by pending actions; demo seed, login, restrictions, reset; first demo sign-in seeds; dashboard metrics without data; ATT&CK coverage states |
 | `test_microsoft.py` | Entra ID sign-in and audit, Defender alert and Windows event mapping (Graph, Azure Monitor, Log Analytics and PowerShell shapes); MFA interrupts and machine logons skipped; alerts raised end to end; re-forwarded alerts de-duplicated; batch limits; ingest key required |
+| `test_fortigate.py` | FortiOS key=value and JSON lines, syslog headers, time zones, SSL-VPN brute force end to end, traffic/DNS/web filter/IPS mapping, relay traffic filter |
 | `test_intel.py` | IOC normalisation (refanging, canonical URLs, hashes), invalid input, unconfigured providers, provider mapping, caching, rate-limit handling, "zero detections is unknown", timeouts, analyst vs provider verdicts |
 
 Also run: `ruff check .`, `ruff format --check .` (clean) and `pip-audit -r requirements.txt`
@@ -37,7 +38,7 @@ Also run: `npm run lint` (clean), `npm run typecheck` (clean), `npm run build` (
 
 ## End-to-end: `cd frontend && npm run test:e2e`
 
-Playwright against a running frontend and API with the demo seeded. Locally it uses the
+Playwright against a running frontend and API with the demo seeded, run once per theme (`PW_COLOR_SCHEME=dark|light`) so the axe contrast scan covers both palettes. Locally it uses the
 installed Chrome (`PW_CHANNEL=chrome`); CI uses bundled Chromium. **Result: 10 passed.**
 
 - Unauthenticated redirect to login with `next`

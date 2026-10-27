@@ -94,6 +94,8 @@ class User(Base):
     is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = _created_at()
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Set when an administrator removes the account (see migration 0002).
+    removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     organization: Mapped[Organization] = relationship(lazy="joined")
 

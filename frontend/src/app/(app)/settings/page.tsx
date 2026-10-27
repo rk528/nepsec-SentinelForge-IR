@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, FlaskConical, KeyRound, Play, Plus } from "lucide-react";
+import { Copy, FlaskConical, KeyRound, Play, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import { StatusDot, SyntheticBadge } from "@/components/ui/badges";
@@ -37,7 +37,10 @@ function OneTimeKey({ secret, onClose }: { secret: string | null; onClose: () =>
         <Input readOnly value={secret ?? ""} className="mono" aria-label="Ingest key" onFocus={(e) => e.currentTarget.select()} />
         <Button icon={<Copy className="size-3.5" aria-hidden />} onClick={() => { navigator.clipboard?.writeText(secret ?? ""); toast({ kind: "info", title: "Copied to clipboard" }); }}>Copy</Button>
       </div>
-      <p className="mt-3 text-xs text-muted">Send events with <span className="mono text-fg">Authorization: Bearer &lt;key&gt;</span> to <span className="mono text-fg">POST /api/v1/ingest/events</span>. See docs/api.md.</p>
+      <p className="mt-3 text-sm text-muted">
+        Shippers send it as <span className="mono text-fg">Authorization: Bearer &lt;key&gt;</span>. Endpoints: <span className="mono text-fg">/api/v1/ingest/events</span> (normalised JSON),{" "}
+        <span className="mono text-fg">/ingest/microsoft/…</span> (Entra ID, Defender, Windows) and <span className="mono text-fg">/ingest/fortigate</span> (FortiGate relay). See the connector guides in docs/.
+      </p>
     </Dialog>
   );
 }
@@ -51,50 +54,83 @@ function DataSources() {
   const [name, setName] = useState("");
   const [type, setType] = useState("custom");
   const [secret, setSecret] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<{ kind: "revoke" | "delete"; source: DataSource } | null>(null);
   const q = useQuery({ queryKey: ["data-sources"], queryFn: () => api<DataSource[]>("/data-sources") });
+  const refresh = () => qc.invalidateQueries({ queryKey: ["data-sources"] });
   const create = useMutation({
     mutationFn: () => api<DataSource & { ingest_key: string }>("/data-sources", { method: "POST", body: { name, source_type: type } }),
-    onSuccess: (s) => { qc.invalidateQueries({ queryKey: ["data-sources"] }); setCreating(false); setName(""); setSecret(s.ingest_key); },
+    onSuccess: (s) => { refresh(); setCreating(false); setName(""); setSecret(s.ingest_key); },
     onError: (e) => toast({ kind: "error", title: "Not created", description: errText(e) }),
   });
   const rotate = useMutation({
     mutationFn: (id: string) => api<DataSource & { ingest_key: string }>(`/data-sources/${id}/rotate-key`, { method: "POST" }),
-    onSuccess: (s) => { qc.invalidateQueries({ queryKey: ["data-sources"] }); setSecret(s.ingest_key); },
-    onError: (e) => toast({ kind: "error", title: "Key not rotated", description: errText(e) }),
+    onSuccess: (s) => { refresh(); setSecret(s.ingest_key); },
+    onError: (e) => toast({ kind: "error", title: "Key not issued", description: errText(e) }),
+  });
+  const remove = useMutation({
+    mutationFn: ({ kind, source }: { kind: "revoke" | "delete"; source: DataSource }) =>
+      kind === "revoke" ? api(`/data-sources/${source.id}/revoke-key`, { method: "POST" }) : api(`/data-sources/${source.id}`, { method: "DELETE" }),
+    onSuccess: (_, v) => { refresh(); setConfirm(null); toast({ kind: "success", title: v.kind === "revoke" ? "Ingest key revoked" : "Data source deleted" }); },
+    onError: (e) => { setConfirm(null); toast({ kind: "error", title: "Not changed", description: errText(e) }); },
   });
   const canManage = isAdmin && !me?.is_demo;
   // Snapshot "now" once so health labels are stable between renders.
   const [now] = useState(() => Date.now());
   return (
-    <Panel title="Data sources" description="Each source has its own ingest key. Health reflects the last event received." bodyClassName="p-0" id="sources" actions={canManage && <Button size="sm" icon={<Plus className="size-3" aria-hidden />} onClick={() => setCreating(true)}>Add source</Button>}>
-      {q.isError ? <ErrorState error={q.error} onRetry={() => q.refetch()} /> : !q.data ? <Skeleton className="m-4 h-24" /> : q.data.length === 0 ? <EmptyState title="No data sources" /> : (
+    <Panel title="Data sources" description="Each source has its own ingest key. Health reflects the last event received." bodyClassName="p-0" id="sources" actions={canManage && <Button size="sm" icon={<Plus className="size-3.5" aria-hidden />} onClick={() => setCreating(true)}>Add source</Button>}>
+      {q.isError ? <ErrorState error={q.error} onRetry={() => q.refetch()} /> : !q.data ? <Skeleton className="m-5 h-24" /> : q.data.length === 0 ? <EmptyState title="No data sources" description="Add a source to get an ingest key for a log shipper or relay." /> : (
         <ul className="divide-y divide-line">
           {q.data.map((s) => {
             const healthy = !!s.last_event_at && now - new Date(s.last_event_at).getTime() < 86_400_000;
             return (
-              <li key={s.id} className="flex flex-col gap-1.5 px-5 py-3 md:flex-row md:items-center md:gap-4">
-                <span className="inline-flex w-24 items-center gap-1.5 text-xs text-muted"><StatusDot className={healthy ? "bg-ok" : "bg-warn"} />{healthy ? "Reporting" : "Stale"}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="text-sm text-fg">{s.name}</span> {s.is_synthetic && <SyntheticBadge />}
-                  <span className="block text-xs text-subtle">{s.source_type} · {s.event_count.toLocaleString()} events · last {relativeTime(s.last_event_at)}</span>
-                </span>
-                <span className="mono text-xs text-subtle">{s.has_ingest_key ? `${s.ingest_key_prefix}…` : "no ingest key"}</span>
-                {canManage && s.has_ingest_key && <Button size="sm" variant="ghost" icon={<KeyRound className="size-3" aria-hidden />} loading={rotate.isPending && rotate.variables === s.id} onClick={() => rotate.mutate(s.id)}>Rotate key</Button>}
+              <li key={s.id} className="flex flex-col gap-3 px-5 py-4 lg:flex-row lg:items-center lg:gap-6">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-medium text-fg">{s.name}</span>
+                    {s.is_synthetic && <SyntheticBadge />}
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+                    <span className="inline-flex items-center gap-1.5"><StatusDot className={healthy ? "bg-ok" : "bg-warn"} />{healthy ? "Reporting" : "Stale"}</span>
+                    <span className="mono">{s.source_type}</span>
+                    <span>{s.event_count.toLocaleString()} events</span>
+                    <span>last {relativeTime(s.last_event_at)}</span>
+                    <span className="mono">{s.has_ingest_key ? `key ${s.ingest_key_prefix}…` : "no ingest key"}</span>
+                  </div>
+                </div>
+                {canManage && (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button size="sm" icon={<KeyRound className="size-3.5" aria-hidden />} loading={rotate.isPending && rotate.variables === s.id} onClick={() => rotate.mutate(s.id)}>
+                      {s.has_ingest_key ? "Rotate key" : "Issue key"}
+                    </Button>
+                    {s.has_ingest_key && <Button size="sm" variant="ghost" icon={<KeyRound className="size-3.5" aria-hidden />} onClick={() => setConfirm({ kind: "revoke", source: s })}>Revoke key</Button>}
+                    {s.event_count === 0 && <Button size="sm" variant="danger" icon={<Trash2 className="size-3.5" aria-hidden />} onClick={() => setConfirm({ kind: "delete", source: s })}>Delete</Button>}
+                  </div>
+                )}
               </li>
             );
           })}
         </ul>
       )}
       <Dialog open={creating} onOpenChange={setCreating} title="Add data source" footer={<Button variant="primary" loading={create.isPending} disabled={name.trim().length < 2} onClick={() => create.mutate()}>Create and show key</Button>}>
-        <div className="space-y-3">
-          <Field label="Name" htmlFor="ds-name"><Input id="ds-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} /></Field>
+        <div className="space-y-4">
+          <Field label="Name" htmlFor="ds-name"><Input id="ds-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} placeholder="e.g. FortiGate HQ" /></Field>
           <Field label="Type" htmlFor="ds-type">
             <Select id="ds-type" value={type} onChange={(e) => setType(e.target.value)}>
-              {["windows_security", "sysmon", "microsoft_entra", "microsoft_defender", "linux_auditd", "firewall", "dns", "proxy", "email_gateway", "edr", "custom"].map((t) => <option key={t} value={t}>{t}</option>)}
+              {["windows_security", "sysmon", "microsoft_entra", "microsoft_defender", "fortigate", "linux_auditd", "firewall", "dns", "proxy", "email_gateway", "edr", "custom"].map((t) => <option key={t} value={t}>{t}</option>)}
             </Select>
           </Field>
         </div>
       </Dialog>
+      <ConfirmDialog
+        open={!!confirm}
+        onOpenChange={(o) => !o && setConfirm(null)}
+        destructive
+        title={confirm?.kind === "revoke" ? `Revoke the key for “${confirm.source.name}”?` : `Delete “${confirm?.source.name}”?`}
+        description={confirm?.kind === "revoke" ? "Shippers using this key are rejected immediately. Stored events are kept. You can issue a new key later." : "This source has no stored events, so nothing else is affected."}
+        confirmLabel={confirm?.kind === "revoke" ? "Revoke key" : "Delete source"}
+        loading={remove.isPending}
+        onConfirm={() => confirm && remove.mutate(confirm)}
+      />
       <OneTimeKey secret={secret} onClose={() => setSecret(null)} />
     </Panel>
   );
@@ -105,43 +141,67 @@ function Users() {
   const toast = useToast();
   const { data: me } = useMe();
   const [open, setOpen] = useState(false);
+  const [removing, setRemoving] = useState<AdminUser | null>(null);
   const [form, setForm] = useState({ email: "", display_name: "", role: "analyst" as Role, password: "" });
   const q = useQuery({ queryKey: ["admin-users"], queryFn: () => api<AdminUser[]>("/admin/users") });
+  const refresh = () => qc.invalidateQueries({ queryKey: ["admin-users"] });
   const create = useMutation({
     mutationFn: () => api("/admin/users", { method: "POST", body: form }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-users"] }); setOpen(false); setForm({ email: "", display_name: "", role: "analyst", password: "" }); toast({ kind: "success", title: "User created" }); },
+    onSuccess: () => { refresh(); setOpen(false); setForm({ email: "", display_name: "", role: "analyst", password: "" }); toast({ kind: "success", title: "User created" }); },
     onError: (e) => toast({ kind: "error", title: "User not created", description: errText(e) }),
   });
   const update = useMutation({
     mutationFn: ({ id, body }: { id: string; body: object }) => api(`/admin/users/${id}`, { method: "PATCH", body }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-users"] }); toast({ kind: "success", title: "User updated" }); },
+    onSuccess: () => { refresh(); toast({ kind: "success", title: "User updated" }); },
     onError: (e) => toast({ kind: "error", title: "Not updated", description: errText(e) }),
+  });
+  const remove = useMutation({
+    mutationFn: (id: string) => api(`/admin/users/${id}`, { method: "DELETE" }),
+    onSuccess: () => { refresh(); setRemoving(null); toast({ kind: "success", title: "User removed", description: "They were signed out everywhere and can no longer sign in." }); },
+    onError: (e) => { setRemoving(null); toast({ kind: "error", title: "User not removed", description: errText(e) }); },
   });
   const locked = !!me?.is_demo;
   return (
-    <Panel title="Users and roles" description="Viewer (read-only), analyst (triage and investigate), lead (approve and reopen), admin (users and data sources)." bodyClassName="p-0" id="users" actions={!locked && <Button size="sm" icon={<Plus className="size-3" aria-hidden />} onClick={() => setOpen(true)}>Add user</Button>}>
-      {locked && <p className="border-b border-line px-4 py-2 text-xs text-warn">User management is disabled for demo accounts.</p>}
-      {q.isError ? <ErrorState error={q.error} onRetry={() => q.refetch()} /> : !q.data ? <Skeleton className="m-4 h-24" /> : (
+    <Panel title="Users and roles" description="Viewer (read-only), analyst (triage and investigate), lead (approve and reopen), admin (users and data sources)." bodyClassName="p-0" id="users" actions={!locked && <Button size="sm" icon={<Plus className="size-3.5" aria-hidden />} onClick={() => setOpen(true)}>Add user</Button>}>
+      {locked && <p className="border-b border-line px-5 py-2.5 text-sm text-warn">User management is disabled for demo accounts.</p>}
+      {q.isError ? <ErrorState error={q.error} onRetry={() => q.refetch()} /> : !q.data ? <Skeleton className="m-5 h-24" /> : (
         <ul className="divide-y divide-line">
-          {q.data.map((u) => (
-            <li key={u.id} className="flex flex-col gap-2 px-5 py-3 md:flex-row md:items-center md:gap-4">
-              <span className="min-w-0 flex-1">
-                <span className="text-sm text-fg">{u.display_name}</span>
-                <span className="block text-xs text-subtle">{u.email} · last sign-in {relativeTime(u.last_login_at)}</span>
-              </span>
-              <label className="sr-only" htmlFor={`role-${u.id}`}>Role for {u.display_name}</label>
-              <Select id={`role-${u.id}`} className="w-32" value={u.role} disabled={locked || u.id === me?.id} onChange={(e) => update.mutate({ id: u.id, body: { role: e.target.value } })}>
-                {["viewer", "analyst", "lead", "admin"].map((r) => <option key={r} value={r}>{r}</option>)}
-              </Select>
-              <Button size="sm" variant={u.is_active ? "ghost" : "secondary"} disabled={locked || u.id === me?.id} onClick={() => update.mutate({ id: u.id, body: { is_active: !u.is_active } })}>
-                {u.is_active ? "Deactivate" : "Reactivate"}
-              </Button>
-            </li>
-          ))}
+          {q.data.map((u) => {
+            const self = u.id === me?.id;
+            const initials = u.display_name.split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
+            return (
+              <li key={u.id} className="flex flex-col gap-3 px-5 py-4 md:flex-row md:items-center md:gap-4">
+                <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-accent-soft text-xs font-semibold text-accent">{initials}</span>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="truncate text-sm font-medium text-fg">{u.display_name}</span>
+                      {self && <span className="rounded-md border border-line-strong px-1.5 py-0.5 text-xs text-muted">You</span>}
+                      {!u.is_active && <span className="rounded-md border border-warn/40 bg-warn/10 px-1.5 py-0.5 text-xs text-warn">Deactivated</span>}
+                    </div>
+                    <p className="truncate text-xs text-muted">{u.email}</p>
+                    <p className="text-xs text-muted">Last sign-in {relativeTime(u.last_login_at)}</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 md:shrink-0">
+                  <label className="sr-only" htmlFor={`role-${u.id}`}>Role for {u.display_name}</label>
+                  <Select id={`role-${u.id}`} className="h-8 w-32 text-sm" value={u.role} disabled={locked || self} onChange={(e) => update.mutate({ id: u.id, body: { role: e.target.value } })}>
+                    {["viewer", "analyst", "lead", "admin"].map((r) => <option key={r} value={r}>{r}</option>)}
+                  </Select>
+                  <Button size="sm" variant="secondary" className="w-28" disabled={locked || self} onClick={() => update.mutate({ id: u.id, body: { is_active: !u.is_active } })}>
+                    {u.is_active ? "Deactivate" : "Reactivate"}
+                  </Button>
+                  <Button size="sm" variant="danger" icon={<Trash2 className="size-3.5" aria-hidden />} disabled={locked || self} onClick={() => setRemoving(u)} aria-label={`Remove ${u.display_name}`}>
+                    Remove
+                  </Button>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
       <Dialog open={open} onOpenChange={setOpen} title="Add user" description="Passwords need 12+ characters with upper and lower case letters and a digit. Share them out of band." footer={<Button variant="primary" loading={create.isPending} onClick={() => create.mutate()}>Create user</Button>}>
-        <div className="space-y-3">
+        <div className="space-y-4">
           <Field label="Email" htmlFor="u-email"><Input id="u-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
           <Field label="Display name" htmlFor="u-name"><Input id="u-name" value={form.display_name} onChange={(e) => setForm({ ...form, display_name: e.target.value })} /></Field>
           <Field label="Role" htmlFor="u-role">
@@ -150,6 +210,16 @@ function Users() {
           <Field label="Initial password" htmlFor="u-pw"><Input id="u-pw" type="password" autoComplete="new-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></Field>
         </div>
       </Dialog>
+      <ConfirmDialog
+        open={!!removing}
+        onOpenChange={(o) => !o && setRemoving(null)}
+        destructive
+        title={`Remove ${removing?.display_name}?`}
+        description="They are signed out everywhere and can no longer sign in. Their past notes, approvals and audit entries are kept. The email address can be used for a new account."
+        confirmLabel="Remove user"
+        loading={remove.isPending}
+        onConfirm={() => removing && remove.mutate(removing.id)}
+      />
     </Panel>
   );
 }

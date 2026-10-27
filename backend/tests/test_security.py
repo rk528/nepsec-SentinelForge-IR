@@ -280,3 +280,46 @@ def test_api_client_cookie_jar_is_per_user(api_for) -> None:
     a = api_for("analyst", "acme")
     b = api_for("analyst", "globex")
     assert a.get("/api/v1/auth/me").json()["org_id"] != b.get("/api/v1/auth/me").json()["org_id"]
+
+
+def test_admin_removes_user_and_email_is_freed(api_for, make_user, app) -> None:
+    admin = api_for("admin")
+    victim = make_user("analyst")
+    other = Api(TestClient(app)).login(victim.email)
+    assert admin.client.delete(f"/api/v1/admin/users/{victim.id}").status_code == 403  # CSRF required
+    r = admin.client.delete(f"/api/v1/admin/users/{victim.id}", headers={"X-CSRF-Token": admin.csrf})
+    assert r.status_code == 204
+    assert other.get("/api/v1/auth/me").status_code == 401  # sessions revoked
+    assert TestClient(app).post("/api/v1/auth/login", json={"email": victim.email, "password": PASSWORD}).status_code == 401
+    listed = admin.get("/api/v1/admin/users").json()
+    assert all(u["id"] != str(victim.id) for u in listed)
+    # The address can be used for a new account, and the removal is audited.
+    again = admin.post("/api/v1/admin/users", json={"email": victim.email, "display_name": "Back", "role": "viewer", "password": "Fresh-Account-Pass-1"})
+    assert again.status_code == 201, again.text
+    audit = admin.get("/api/v1/audit", params={"action": "user.removed"}).json()["items"]
+    assert audit and audit[0]["details"]["email"] == victim.email
+
+
+def test_remove_user_guards(api_for, make_user) -> None:
+    admin = api_for("admin")
+    me = admin.user["id"]
+    assert admin.client.delete(f"/api/v1/admin/users/{me}", headers={"X-CSRF-Token": admin.csrf}).status_code == 422
+    stranger = make_user("analyst", org="globex")
+    assert admin.client.delete(f"/api/v1/admin/users/{stranger.id}", headers={"X-CSRF-Token": admin.csrf}).status_code == 404
+    analyst = api_for("analyst")
+    assert analyst.client.delete(f"/api/v1/admin/users/{stranger.id}", headers={"X-CSRF-Token": analyst.csrf}).status_code == 403
+
+
+def test_revoke_key_and_delete_source(api_for) -> None:
+    admin = api_for("admin")
+    key = create_source(admin, "FortiGate test")
+    src = next(s for s in admin.get("/api/v1/data-sources").json() if s["name"] == "FortiGate test")
+    r = admin.post(f"/api/v1/data-sources/{src['id']}/revoke-key")
+    assert r.status_code == 200 and r.json()["has_ingest_key"] is False
+    assert ingest(admin.client, key, brute_force_events()).status_code == 401
+    assert admin.client.delete(f"/api/v1/data-sources/{src['id']}", headers={"X-CSRF-Token": admin.csrf}).status_code == 204
+    # A source that has stored events is kept as evidence.
+    key2 = create_source(admin, "Busy source")
+    assert ingest(admin.client, key2, brute_force_events()).status_code == 200
+    busy = next(s for s in admin.get("/api/v1/data-sources").json() if s["name"] == "Busy source")
+    assert admin.client.delete(f"/api/v1/data-sources/{busy['id']}", headers={"X-CSRF-Token": admin.csrf}).status_code == 409
