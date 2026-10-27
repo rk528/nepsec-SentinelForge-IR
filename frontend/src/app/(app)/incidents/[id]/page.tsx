@@ -99,7 +99,7 @@ function TransitionDialog({ incident, target, onClose }: { incident: Incident; t
                   <label key={v.value} className={cn("flex cursor-pointer gap-2.5 rounded-md border px-3 py-2", verdict === v.value ? "border-accent/60 bg-accent-soft" : "border-line-strong hover:bg-overlay")}>
                     <input type="radio" name="verdict" value={v.value} checked={verdict === v.value} onChange={() => setVerdict(v.value)} className="mt-0.5 accent-[var(--color-accent)]" />
                     <span>
-                      <span className="block text-[13px] text-fg">{v.label}</span>
+                      <span className="block text-sm text-fg">{v.label}</span>
                       <span className="block text-xs text-muted">{v.help}</span>
                     </span>
                   </label>
@@ -137,7 +137,7 @@ function PropertiesRail({ incident }: { incident: Incident }) {
   return (
     <div className="space-y-4">
       <Panel title="Properties" id="props">
-        <div className="space-y-3 text-[13px]">
+        <div className="space-y-3 text-sm">
           <div className="flex items-center justify-between gap-3">
             <span className="text-xs text-muted">Status</span>
             <IncidentStatusBadge status={incident.status} />
@@ -221,7 +221,7 @@ function PropertiesRail({ incident }: { incident: Incident }) {
         {incident.status === "closed" ? (
           <div className="space-y-2">
             <VerdictBadge verdict={incident.verdict} />
-            <p className="text-[13px] whitespace-pre-wrap text-fg">{incident.closure_reason}</p>
+            <p className="text-sm whitespace-pre-wrap text-fg">{incident.closure_reason}</p>
           </div>
         ) : (
           <p className="text-xs text-muted">Closing requires a verdict and a closure reason, and no pending response actions. True positive, benign positive, false positive and undetermined are recorded separately from severity.</p>
@@ -287,7 +287,7 @@ function NotesTab({ incident }: { incident: Incident }) {
                     {formatDateTime(n.created_at)}
                   </span>
                 </div>
-                <p className="text-[13px] whitespace-pre-wrap text-fg">{n.body}</p>
+                <p className="text-sm whitespace-pre-wrap text-fg">{n.body}</p>
               </li>
             ))}
         </ul>
@@ -341,7 +341,7 @@ function IndicatorsTab({ incident }: { incident: Incident }) {
           {linked.data.map(({ indicator, providers }) => (
             <li key={indicator.id} className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center">
               <div className="min-w-0 flex-1">
-                <Link href={`/threat-intel?id=${indicator.id}`} className="mono text-[13px] break-all text-fg hover:underline">
+                <Link href={`/threat-intel?id=${indicator.id}`} className="mono text-sm break-all text-fg hover:underline">
                   {indicator.value}
                 </Link>
                 <p className="text-xs text-subtle uppercase">{indicator.ioc_type}</p>
@@ -417,10 +417,10 @@ function ResponseTab({ incident, events }: { incident: Incident; events: EventRe
             {playbooks.data.map((pb) => (
               <li key={pb.id} className="flex flex-col justify-between gap-2 rounded-lg border border-line bg-raised/30 p-3">
                 <div>
-                  <p className="flex flex-wrap items-center gap-2 text-[13px] font-medium text-fg">
+                  <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-fg">
                     {pb.name}
                     {pb.simulated && <SimulatedBadge />}
-                    {pb.requires_approval && <span className="text-[11px] text-warn">Needs approval</span>}
+                    {pb.requires_approval && <span className="text-xs text-warn">Needs approval</span>}
                   </p>
                   <p className="mt-1 text-xs text-muted">{pb.description}</p>
                 </div>
@@ -457,8 +457,8 @@ function ResponseTab({ incident, events }: { incident: Incident; events: EventRe
               return (
                 <li key={a.id} className="space-y-1.5 px-3 py-2.5">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[13px] font-medium text-fg">{humanize(a.action_type)}</span>
-                    <span className={cn("rounded px-1.5 py-px text-[11px]", a.status === "pending_approval" ? "bg-warn/15 text-warn" : a.status === "executed" ? "bg-ok/10 text-ok" : a.status === "failed" ? "bg-danger/15 text-danger" : "bg-raised text-muted")}>{humanize(a.status)}</span>
+                    <span className="text-sm font-medium text-fg">{humanize(a.action_type)}</span>
+                    <span className={cn("rounded px-1.5 py-px text-xs", a.status === "pending_approval" ? "bg-warn/15 text-warn" : a.status === "executed" ? "bg-ok/10 text-ok" : a.status === "failed" ? "bg-danger/15 text-danger" : "bg-raised text-muted")}>{humanize(a.status)}</span>
                     {a.simulated && <SimulatedBadge />}
                     <span className="ml-auto text-xs text-subtle" title={utcTitle(a.created_at)}>
                       {a.requested_by_name ?? "Unknown"} · {relativeTime(a.created_at)}
@@ -556,7 +556,7 @@ function SummaryEditor({ incident }: { incident: Incident }) {
   );
 }
 
-const TAB = "border-b-2 border-transparent px-3 pb-2.5 pt-3 text-[13px] text-muted transition-colors hover:text-fg data-[state=active]:border-accent data-[state=active]:text-fg";
+const TAB = "shrink-0 whitespace-nowrap border-b-2 border-transparent px-3 pb-2.5 pt-3 text-sm text-muted transition-colors hover:text-fg data-[state=active]:border-accent data-[state=active]:font-medium data-[state=active]:text-fg";
 
 export default function IncidentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -634,7 +634,7 @@ export default function IncidentDetailPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-4">
           <Panel title="Summary" actions={<SummaryEditor incident={inc} />} id="summary">
-            {inc.summary ? <p className="text-[13px] whitespace-pre-wrap text-fg">{inc.summary}</p> : <p className="text-[13px] text-subtle">No summary yet.</p>}
+            {inc.summary ? <p className="text-sm whitespace-pre-wrap text-fg">{inc.summary}</p> : <p className="text-sm text-subtle">No summary yet.</p>}
             <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-muted">
               <span>{plural(inc.alert_count, "linked alert")}</span>
               <span>{plural(inc.event_count, "evidence event")}</span>
@@ -672,7 +672,7 @@ export default function IncidentDetailPage() {
                     <li key={a.id}>
                       <Link href={`/alerts/${a.id}`} className="flex flex-col gap-1 px-4 py-3 hover:bg-raised/60 sm:flex-row sm:items-center sm:gap-3">
                         <SeverityBadge severity={a.severity} />
-                        <span className="min-w-0 flex-1 truncate text-[13px] text-fg">{a.title}</span>
+                        <span className="min-w-0 flex-1 truncate text-sm text-fg">{a.title}</span>
                         <span className="mono text-xs text-muted">{a.rule_id}</span>
                         <ConfidenceMeter confidence={a.confidence} />
                         <AlertStatusBadge status={a.status} />
@@ -699,7 +699,7 @@ export default function IncidentDetailPage() {
               ) : (
                 <ul className="divide-y divide-line">
                   {auditLog.data.map((a) => (
-                    <li key={a.id} className="flex flex-col gap-0.5 px-4 py-2.5 sm:flex-row sm:items-center sm:gap-3">
+                    <li key={a.id} className="flex flex-col gap-0.5 px-5 py-3 sm:flex-row sm:items-center sm:gap-3">
                       <span className="mono w-52 shrink-0 text-xs text-fg">{a.action}</span>
                       <span className="min-w-0 flex-1 truncate text-xs text-muted">{a.actor_label}</span>
                       <span className="text-xs text-subtle" title={utcTitle(a.created_at)}>
@@ -709,7 +709,7 @@ export default function IncidentDetailPage() {
                   ))}
                 </ul>
               )}
-              <div className="border-t border-line px-4 py-2.5 text-right">
+              <div className="border-t border-line px-5 py-3 text-right">
                 <Link href={`/audit?target_id=${inc.id}`} className="inline-flex items-center gap-1 text-xs text-accent hover:underline">
                   Search full audit log <ArrowUpRight className="size-3" aria-hidden />
                 </Link>

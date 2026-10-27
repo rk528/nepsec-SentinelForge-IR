@@ -13,10 +13,10 @@ export interface Column<T> {
   sortKey?: string;
   className?: string;
   headerClassName?: string;
-  hideBelow?: "sm" | "md" | "lg";
+  hideBelow?: "sm" | "md" | "lg" | "xl";
 }
 
-const hide = { sm: "hidden sm:table-cell", md: "hidden md:table-cell", lg: "hidden lg:table-cell" };
+const hide = { sm: "hidden sm:table-cell", md: "hidden md:table-cell", lg: "hidden lg:table-cell", xl: "hidden xl:table-cell" };
 
 export function DataTable<T>({
   columns,
@@ -40,9 +40,9 @@ export function DataTable<T>({
   const router = useRouter();
   return (
     <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-left text-[13px]">
+      <table className="w-full border-collapse text-left text-sm">
         <caption className="sr-only">{caption}</caption>
-        <thead>
+        <thead className="bg-raised/60">
           <tr className="border-b border-line">
             {columns.map((c) => {
               const active = c.sortKey && sort === c.sortKey;
@@ -51,10 +51,10 @@ export function DataTable<T>({
                   key={c.key}
                   scope="col"
                   aria-sort={active ? (order === "asc" ? "ascending" : "descending") : undefined}
-                  className={cn("h-9 px-3 text-[11px] font-medium tracking-wide whitespace-nowrap text-subtle uppercase first:pl-4 last:pr-4", c.hideBelow && hide[c.hideBelow], c.headerClassName)}
+                  className={cn("h-10 px-3 text-xs font-medium whitespace-nowrap text-muted first:pl-5 last:pr-5", c.hideBelow && hide[c.hideBelow], c.headerClassName)}
                 >
                   {c.sortKey && onSort ? (
-                    <button type="button" onClick={() => onSort(c.sortKey!)} className="inline-flex items-center gap-1 uppercase hover:text-fg">
+                    <button type="button" onClick={() => onSort(c.sortKey!)} className="inline-flex items-center gap-1 hover:text-fg">
                       {c.header}
                       {active && (order === "asc" ? <ArrowUp className="size-3" aria-hidden /> : <ArrowDown className="size-3" aria-hidden />)}
                     </button>
@@ -81,10 +81,10 @@ export function DataTable<T>({
                       }
                     : undefined
                 }
-                className={cn("h-10 border-b border-line/70 transition-colors last:border-b-0", href && "cursor-pointer hover:bg-raised/70")}
+                className={cn("border-b border-line/80 transition-colors last:border-b-0 hover:bg-raised/40", href && "cursor-pointer")}
               >
                 {columns.map((c) => (
-                  <td key={c.key} className={cn("px-3 align-middle first:pl-4 last:pr-4", c.hideBelow && hide[c.hideBelow], c.className)}>
+                  <td key={c.key} className={cn("px-3 py-3 align-middle first:pl-5 last:pr-5", c.hideBelow && hide[c.hideBelow], c.className)}>
                     {c.render(row)}
                   </td>
                 ))}
@@ -102,7 +102,7 @@ export function Pagination({ page, pageSize, total, onPage }: { page: number; pa
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const to = Math.min(total, page * pageSize);
   return (
-    <nav aria-label="Pagination" className="flex items-center justify-between gap-3 border-t border-line px-4 py-2.5 text-xs text-muted">
+    <nav aria-label="Pagination" className="flex items-center justify-between gap-3 border-t border-line px-5 py-3 text-sm text-muted">
       <span>
         {from.toLocaleString()}–{to.toLocaleString()} of {total.toLocaleString()}
       </span>

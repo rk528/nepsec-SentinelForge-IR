@@ -72,10 +72,10 @@ function DataSources() {
           {q.data.map((s) => {
             const healthy = !!s.last_event_at && now - new Date(s.last_event_at).getTime() < 86_400_000;
             return (
-              <li key={s.id} className="flex flex-col gap-1.5 px-4 py-2.5 md:flex-row md:items-center md:gap-4">
+              <li key={s.id} className="flex flex-col gap-1.5 px-5 py-3 md:flex-row md:items-center md:gap-4">
                 <span className="inline-flex w-24 items-center gap-1.5 text-xs text-muted"><StatusDot className={healthy ? "bg-ok" : "bg-warn"} />{healthy ? "Reporting" : "Stale"}</span>
                 <span className="min-w-0 flex-1">
-                  <span className="text-[13px] text-fg">{s.name}</span> {s.is_synthetic && <SyntheticBadge />}
+                  <span className="text-sm text-fg">{s.name}</span> {s.is_synthetic && <SyntheticBadge />}
                   <span className="block text-xs text-subtle">{s.source_type} · {s.event_count.toLocaleString()} events · last {relativeTime(s.last_event_at)}</span>
                 </span>
                 <span className="mono text-xs text-subtle">{s.has_ingest_key ? `${s.ingest_key_prefix}…` : "no ingest key"}</span>
@@ -124,9 +124,9 @@ function Users() {
       {q.isError ? <ErrorState error={q.error} onRetry={() => q.refetch()} /> : !q.data ? <Skeleton className="m-4 h-24" /> : (
         <ul className="divide-y divide-line">
           {q.data.map((u) => (
-            <li key={u.id} className="flex flex-col gap-2 px-4 py-2.5 md:flex-row md:items-center md:gap-4">
+            <li key={u.id} className="flex flex-col gap-2 px-5 py-3 md:flex-row md:items-center md:gap-4">
               <span className="min-w-0 flex-1">
-                <span className="text-[13px] text-fg">{u.display_name}</span>
+                <span className="text-sm text-fg">{u.display_name}</span>
                 <span className="block text-xs text-subtle">{u.email} · last sign-in {relativeTime(u.last_login_at)}</span>
               </span>
               <label className="sr-only" htmlFor={`role-${u.id}`}>Role for {u.display_name}</label>
@@ -174,7 +174,7 @@ function Scenarios({ orgIsDemo }: { orgIsDemo: boolean }) {
           {q.data.map((s) => (
             <li key={s.id} className="flex flex-col gap-2 px-4 py-3 md:flex-row md:items-start md:gap-4">
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-medium text-fg">{s.name}</p>
+                <p className="text-sm font-medium text-fg">{s.name}</p>
                 <p className="mt-0.5 text-xs text-muted">{s.description}</p>
                 <p className="mt-1 text-xs text-subtle">Expected: <span className="mono">{s.expected_rules.join(", ")}</span> · {s.expected_decision}</p>
               </div>
@@ -247,7 +247,7 @@ export default function SettingsPage() {
             {!sys.data ? <Skeleton className="h-24" /> : (
               <ul className="space-y-2">
                 {sys.data.integrations.map((i) => (
-                  <li key={i.name} className="flex items-center justify-between text-[13px]">
+                  <li key={i.name} className="flex items-center justify-between text-sm">
                     <span className="text-fg">{i.name}</span>
                     <span className="inline-flex items-center gap-1.5 text-xs text-muted"><StatusDot className={i.configured ? "bg-ok" : "bg-subtle"} />{i.configured ? "Configured" : "Not configured"}</span>
                   </li>

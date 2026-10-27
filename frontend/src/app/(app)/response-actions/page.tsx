@@ -76,8 +76,8 @@ function ResponseActions() {
                 return (
                   <li key={a.id} className="space-y-2 px-4 py-3">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-[13px] font-medium text-fg">{humanize(a.action_type)}</span>
-                      <span className={cn("rounded px-1.5 py-px text-[11px]", a.status === "pending_approval" ? "bg-warn/15 text-warn" : a.status === "executed" ? "bg-ok/10 text-ok" : a.status === "failed" ? "bg-danger/15 text-danger" : "bg-raised text-muted")}>{humanize(a.status)}</span>
+                      <span className="text-sm font-medium text-fg">{humanize(a.action_type)}</span>
+                      <span className={cn("rounded px-1.5 py-px text-xs", a.status === "pending_approval" ? "bg-warn/15 text-warn" : a.status === "executed" ? "bg-ok/10 text-ok" : a.status === "failed" ? "bg-danger/15 text-danger" : "bg-raised text-muted")}>{humanize(a.status)}</span>
                       {a.simulated && <SimulatedBadge />}
                       <Link href={`/incidents/${a.incident_id}`} className="mono text-xs text-accent hover:underline">
                         INC-{String(a.incident_number ?? 0).padStart(4, "0")}

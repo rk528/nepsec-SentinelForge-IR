@@ -58,10 +58,10 @@ function EscalateDialog({ alert, open, onOpenChange }: { alert: Alert; open: boo
     >
       <fieldset className="space-y-2">
         <legend className="sr-only">Escalation target</legend>
-        <label className="flex items-center gap-2 text-[13px] text-fg">
+        <label className="flex items-center gap-2 text-sm text-fg">
           <input type="radio" name="mode" checked={mode === "new"} onChange={() => setMode("new")} className="accent-[var(--color-accent)]" /> Create a new incident
         </label>
-        <label className="flex items-center gap-2 text-[13px] text-fg">
+        <label className="flex items-center gap-2 text-sm text-fg">
           <input type="radio" name="mode" checked={mode === "existing"} onChange={() => setMode("existing")} className="accent-[var(--color-accent)]" /> Link to an existing incident
         </label>
         {mode === "existing" && (
@@ -209,19 +209,19 @@ export default function AlertDetailPage() {
             />
             {evidenceEntries.length > 0 && (
               <div className="mt-4">
-                <p className="mb-1 text-[11px] font-medium tracking-wide text-subtle uppercase">Rule evidence</p>
+                <p className="mb-1 text-xs font-medium tracking-wide text-subtle uppercase">Rule evidence</p>
                 <JsonViewer value={Object.fromEntries(evidenceEntries)} maxHeight="12rem" />
               </div>
             )}
             {typeof alert.evidence_summary.command_line === "string" && (
               <div className="mt-4">
-                <p className="mb-1 text-[11px] font-medium tracking-wide text-subtle uppercase">Command line (untrusted)</p>
+                <p className="mb-1 text-xs font-medium tracking-wide text-subtle uppercase">Command line (untrusted)</p>
                 <JsonViewer value={alert.evidence_summary.command_line} maxHeight="8rem" />
               </div>
             )}
             {alert.disposition_reason && (
-              <p className="mt-4 rounded-md border border-line bg-raised/40 p-3 text-[13px] text-fg">
-                <span className="mb-1 block text-[11px] font-medium tracking-wide text-subtle uppercase">Triage decision</span>
+              <p className="mt-4 rounded-md border border-line bg-raised/40 p-3 text-sm text-fg">
+                <span className="mb-1 block text-xs font-medium tracking-wide text-subtle uppercase">Triage decision</span>
                 {alert.disposition_reason}
               </p>
             )}
@@ -232,14 +232,14 @@ export default function AlertDetailPage() {
         </div>
         <div className="space-y-4">
           <Panel title={rule.name} description={<span className="mono">{rule.id} · v{rule.version}</span>} id="rule">
-            <div className="space-y-3 text-[13px]">
+            <div className="space-y-3 text-sm">
               <p className="text-muted">{rule.description}</p>
               <div>
-                <p className="text-[11px] font-medium tracking-wide text-subtle uppercase">Rationale</p>
+                <p className="text-xs font-medium tracking-wide text-subtle uppercase">Rationale</p>
                 <p className="mt-0.5 text-fg">{rule.rationale}</p>
               </div>
               <div>
-                <p className="text-[11px] font-medium tracking-wide text-subtle uppercase">Required telemetry</p>
+                <p className="text-xs font-medium tracking-wide text-subtle uppercase">Required telemetry</p>
                 <ul className="mt-0.5 list-disc space-y-0.5 pl-4 text-xs text-muted">
                   {rule.required_telemetry.map((t) => (
                     <li key={t} className="mono">{t}</li>
@@ -247,7 +247,7 @@ export default function AlertDetailPage() {
                 </ul>
               </div>
               <div>
-                <p className="text-[11px] font-medium tracking-wide text-subtle uppercase">Known false positives</p>
+                <p className="text-xs font-medium tracking-wide text-subtle uppercase">Known false positives</p>
                 <ul className="mt-0.5 list-disc space-y-0.5 pl-4 text-xs text-muted">
                   {rule.false_positives.map((t) => (
                     <li key={t}>{t}</li>
@@ -255,7 +255,7 @@ export default function AlertDetailPage() {
                 </ul>
               </div>
               <div>
-                <p className="text-[11px] font-medium tracking-wide text-subtle uppercase">ATT&amp;CK (design intent)</p>
+                <p className="text-xs font-medium tracking-wide text-subtle uppercase">ATT&amp;CK (design intent)</p>
                 <p className="mono mt-0.5 text-xs text-muted">{rule.attack_techniques.join(", ")}</p>
               </div>
               <Link href={`/detections#${rule.id}`} className="inline-flex items-center gap-1 text-xs text-accent hover:underline">

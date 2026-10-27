@@ -42,15 +42,18 @@ const RANGES = [
 function Kpi({ label, value, sub, icon, href }: { label: string; value: ReactNode; sub: ReactNode; icon: ReactNode; href?: string }) {
   const body = (
     <>
-      <div className="flex items-center justify-between text-xs text-muted">
-        <span>{label}</span>
-        <span className="text-subtle">{icon}</span>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm text-muted">{label}</p>
+          <p className="mt-1.5 text-3xl font-semibold tracking-tight text-fg tabular-nums">{value}</p>
+        </div>
+        <span className="inline-flex shrink-0 items-center rounded-md border border-line-strong p-1.5 text-muted">{icon}</span>
       </div>
-      <div className="mt-2 text-2xl font-semibold tracking-tight text-fg tabular-nums">{value}</div>
-      <div className="mt-1 text-xs text-muted">{sub}</div>
+      <div className="mt-auto pt-5 text-sm text-muted">{sub}</div>
     </>
   );
-  const cls = "block rounded-lg border border-line bg-surface p-4 transition-colors";
+  // shadcn/ui dashboard-01 "SectionCards": gradient card, label, large tabular figure, footer line.
+  const cls = "flex flex-col rounded-xl border border-line bg-gradient-to-t from-accent/[0.06] to-surface p-6 shadow-xs transition-colors";
   return href ? (
     <Link href={href} className={cn(cls, "group hover:border-line-strong hover:bg-raised/40")}>
       {body}
@@ -87,10 +90,10 @@ function Dashboard() {
           <ErrorState error={q.error} onRetry={() => q.refetch()} />
         </Panel>
       ) : (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {!s ? (
-              Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[106px] rounded-lg" />)
+              Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[150px] rounded-xl" />)
             ) : (
               <>
                 <Kpi
@@ -99,10 +102,10 @@ function Dashboard() {
                   value={s.open_incidents.total}
                   href="/incidents?status=new&status=open&status=investigating&status=contained"
                   sub={
-                    <span className="flex flex-wrap gap-x-3">
+                    <span className="flex flex-wrap gap-x-4 gap-y-1">
                       {SEVERITY_ORDER.filter((k) => s.open_incidents.by_severity[k]).map((k) => (
-                        <span key={k} className="inline-flex items-center gap-1">
-                          <span className="size-1.5 rounded-full" style={{ background: SEVERITY_COLOR[k] }} />
+                        <span key={k} className="inline-flex items-center gap-1.5">
+                          <span className="size-2 rounded-full" style={{ background: SEVERITY_COLOR[k] }} />
                           {s.open_incidents.by_severity[k]} {k === "informational" ? "info" : k}
                         </span>
                       ))}
@@ -130,7 +133,7 @@ function Dashboard() {
                     label: <IncidentStatusBadge status={st} />,
                     value: s.incident_status[st] ?? 0,
                     href: `/incidents?status=${st}`,
-                    color: "var(--color-line-strong)",
+                    color: "color-mix(in srgb, var(--color-accent) 55%, transparent)",
                   }))}
                 />
               ) : (
@@ -139,10 +142,10 @@ function Dashboard() {
             </Panel>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+          <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-3">
             <Panel title="High-priority open incidents" description="Critical and high severity, not yet closed" className="xl:col-span-2" bodyClassName="p-0" id="priority">
               {!s ? (
-                <div className="space-y-3 p-4">
+                <div className="space-y-3 p-5">
                   <Skeleton />
                   <Skeleton />
                   <Skeleton />
@@ -153,16 +156,20 @@ function Dashboard() {
                 <ul className="divide-y divide-line">
                   {s.priority_incidents.map((i) => (
                     <li key={i.id}>
-                      <Link href={`/incidents/${i.id}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-raised/60">
-                        <span className="w-[4.5rem] shrink-0">
-                          <SeverityBadge severity={i.severity} />
+                      <Link
+                        href={`/incidents/${i.id}`}
+                        className="grid grid-cols-[5.25rem_1fr] items-center gap-x-3 gap-y-1.5 px-5 py-3 hover:bg-raised/40 sm:grid-cols-[5.25rem_5rem_1fr_7.5rem] md:grid-cols-[5.25rem_5rem_1fr_7.5rem_4.5rem]"
+                      >
+                        <SeverityBadge severity={i.severity} />
+                        <span className="mono hidden text-xs text-muted sm:block">{i.reference}</span>
+                        <span className="min-w-0 text-sm leading-snug font-medium text-fg sm:truncate">
+                          <span className="mono mr-1.5 text-xs font-normal text-muted sm:hidden">{i.reference}</span>
+                          {i.title}
                         </span>
-                        <span className="mono w-20 shrink-0 text-xs text-muted">{i.reference}</span>
-                        <span className="min-w-0 flex-1 truncate text-[13px] text-fg">{i.title}</span>
-                        <span className="hidden sm:block">
+                        <span className="col-start-2 sm:col-start-auto">
                           <IncidentStatusBadge status={i.status} />
                         </span>
-                        <span className="hidden w-16 text-right text-xs text-subtle md:block" title={utcTitle(i.created_at)}>
+                        <span className="hidden text-right text-sm text-muted md:block" title={utcTitle(i.created_at)}>
                           {relativeTime(i.created_at)}
                         </span>
                       </Link>
@@ -175,7 +182,7 @@ function Dashboard() {
               {s ? (
                 <BarList
                   emptyText="No rules fired in this range."
-                  items={s.detections.by_rule.map((r) => ({ key: r.rule_id, label: <span><span className="mono text-muted">{r.rule_id}</span> {r.name}</span>, value: r.count, href: `/alerts?rule_id=${r.rule_id}&hours=${days * 24}` }))}
+                  items={s.detections.by_rule.map((r) => ({ key: r.rule_id, label: <span><span className="mono mr-1.5 text-xs text-muted">{r.rule_id}</span>{r.name}</span>, value: r.count, href: `/alerts?rule_id=${r.rule_id}&hours=${days * 24}` }))}
                 />
               ) : (
                 <Skeleton className="h-48" />
@@ -183,7 +190,7 @@ function Dashboard() {
             </Panel>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
             <Panel
               title="Telemetry health"
               description={s ? `${s.telemetry.assets_reporting_24h} of ${s.telemetry.assets_total} assets reported in the last 24h` : "Data source status"}
@@ -191,7 +198,7 @@ function Dashboard() {
               id="telemetry"
             >
               {!s ? (
-                <div className="space-y-3 p-4">
+                <div className="space-y-3 p-5">
                   <Skeleton />
                   <Skeleton />
                 </div>
@@ -200,16 +207,18 @@ function Dashboard() {
               ) : (
                 <ul className="divide-y divide-line">
                   {s.telemetry.sources.map((src) => (
-                    <li key={src.id} className="flex items-center gap-3 px-4 py-2.5 text-[13px]">
-                      <span className="inline-flex w-24 items-center gap-1.5 text-xs">
-                        <StatusDot className={src.healthy ? "bg-ok" : "bg-warn"} />
-                        {src.healthy ? "Reporting" : "Stale"}
-                      </span>
-                      <Link href={`/events?data_source_id=${src.id}`} className="min-w-0 flex-1 truncate text-fg hover:underline">
-                        {src.name}
-                      </Link>
-                      <span className="hidden text-xs text-muted tabular-nums sm:block">{src.events_in_range.toLocaleString()} events</span>
-                      <span className="w-20 text-right text-xs text-subtle" title={utcTitle(src.last_event_at)}>
+                    <li key={src.id} className="flex items-center gap-3 px-5 py-3 text-sm">
+                      <div className="min-w-0 flex-1">
+                        <Link href={`/events?data_source_id=${src.id}`} className="block leading-snug font-medium text-fg hover:underline">
+                          {src.name}
+                        </Link>
+                        <span className="mt-0.5 inline-flex items-center gap-1.5 text-xs text-muted">
+                          <StatusDot className={src.healthy ? "bg-ok" : "bg-warn"} />
+                          {src.healthy ? "Reporting" : "Stale"}
+                          <span className="tabular-nums">· {src.events_in_range.toLocaleString()} events</span>
+                        </span>
+                      </div>
+                      <span className="shrink-0 text-right text-sm text-muted" title={utcTitle(src.last_event_at)}>
                         {relativeTime(src.last_event_at)}
                       </span>
                     </li>
@@ -217,9 +226,9 @@ function Dashboard() {
                 </ul>
               )}
             </Panel>
-            <Panel title="Recent analyst actions" description="From the audit log" bodyClassName="p-0" id="activity" actions={<Link href="/audit" className="inline-flex items-center gap-1 text-xs text-muted hover:text-fg">Audit log <ArrowUpRight className="size-3" aria-hidden /></Link>}>
+            <Panel title="Recent analyst actions" description="From the audit log" bodyClassName="p-0" id="activity" actions={<Link href="/audit" className="inline-flex items-center gap-1 text-sm text-muted hover:text-fg">Audit log <ArrowUpRight className="size-3.5" aria-hidden /></Link>}>
               {!s ? (
-                <div className="space-y-3 p-4">
+                <div className="space-y-3 p-5">
                   <Skeleton />
                   <Skeleton />
                 </div>
@@ -236,9 +245,9 @@ function Dashboard() {
                       </>
                     );
                     return (
-                      <li key={a.id} className="flex items-center gap-3 px-4 py-2.5 text-[13px]">
-                        <span className="min-w-0 flex-1 truncate">{href ? <Link href={href} className="hover:underline">{text}</Link> : text}</span>
-                        <span className="text-xs text-subtle" title={utcTitle(a.at)}>
+                      <li key={a.id} className="flex items-start gap-3 px-5 py-3 text-sm">
+                        <span className="min-w-0 flex-1 leading-snug break-words">{href ? <Link href={href} className="hover:underline">{text}</Link> : text}</span>
+                        <span className="shrink-0 text-sm text-muted" title={utcTitle(a.at)}>
                           {relativeTime(a.at)}
                         </span>
                       </li>

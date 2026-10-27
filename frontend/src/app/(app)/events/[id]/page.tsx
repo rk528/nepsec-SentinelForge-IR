@@ -43,7 +43,7 @@ export default function EventDetailPage() {
             <KeyValue columns={3} items={eventFields(event)} />
             {event.command_line && (
               <div className="mt-4">
-                <p className="mb-1 text-[11px] font-medium tracking-wide text-subtle uppercase">Command line (untrusted)</p>
+                <p className="mb-1 text-xs font-medium tracking-wide text-subtle uppercase">Command line (untrusted)</p>
                 <JsonViewer value={event.command_line} maxHeight="8rem" />
               </div>
             )}
@@ -72,7 +72,7 @@ export default function EventDetailPage() {
             {alerts.length === 0 && incidents.length === 0 ? (
               <p className="text-xs text-muted">Not referenced by any alert or incident.</p>
             ) : (
-              <ul className="space-y-2 text-[13px]">
+              <ul className="space-y-2 text-sm">
                 {alerts.map((a) => (
                   <li key={a.id} className="flex items-center gap-2">
                     <SeverityBadge severity={a.severity} compact />

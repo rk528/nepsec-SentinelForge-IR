@@ -71,7 +71,7 @@ function Audit() {
                 const href = targetHref(a);
                 const open = expanded === a.id;
                 return (
-                  <li key={a.id} className="px-4 py-2.5">
+                  <li key={a.id} className="px-5 py-3">
                     <div className="flex flex-col gap-1 md:flex-row md:items-center md:gap-4">
                       <span className="mono w-44 shrink-0 text-xs text-subtle" title={utcTitle(a.created_at)}>{formatDateTime(a.created_at)}</span>
                       <span className="mono w-56 shrink-0 text-xs text-fg">{a.action}</span>

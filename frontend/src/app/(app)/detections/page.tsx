@@ -25,7 +25,7 @@ function RuleCard({ rule }: { rule: RuleRow }) {
       <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex w-full flex-col gap-2 px-4 py-3 text-left hover:bg-raised/40 md:flex-row md:items-center md:gap-4">
         <span className="mono w-28 shrink-0 text-xs text-muted">{rule.id}</span>
         <span className="min-w-0 flex-1">
-          <span className="block text-[13px] font-medium text-fg">{rule.name}</span>
+          <span className="block text-sm font-medium text-fg">{rule.name}</span>
           <span className="block truncate text-xs text-subtle">{rule.description}</span>
         </span>
         <span className="flex flex-wrap items-center gap-3">
@@ -41,21 +41,21 @@ function RuleCard({ rule }: { rule: RuleRow }) {
       </button>
       {open && (
         <div className="grid gap-5 border-t border-line px-4 py-4 lg:grid-cols-2">
-          <div className="space-y-3 text-[13px]">
+          <div className="space-y-3 text-sm">
             <div>
-              <p className="text-[11px] font-medium tracking-wide text-subtle uppercase">Rationale</p>
+              <p className="text-xs font-medium tracking-wide text-subtle uppercase">Rationale</p>
               <p className="mt-0.5 text-fg">{rule.rationale}</p>
             </div>
             <div>
-              <p className="text-[11px] font-medium tracking-wide text-subtle uppercase">Required telemetry</p>
+              <p className="text-xs font-medium tracking-wide text-subtle uppercase">Required telemetry</p>
               <ul className="mt-0.5 list-disc pl-4 text-xs text-muted">{rule.required_telemetry.map((x) => <li key={x} className="mono">{x}</li>)}</ul>
             </div>
             <div>
-              <p className="text-[11px] font-medium tracking-wide text-subtle uppercase">False-positive considerations</p>
+              <p className="text-xs font-medium tracking-wide text-subtle uppercase">False-positive considerations</p>
               <ul className="mt-0.5 list-disc pl-4 text-xs text-muted">{rule.false_positives.map((x) => <li key={x}>{x}</li>)}</ul>
             </div>
             <div>
-              <p className="text-[11px] font-medium tracking-wide text-subtle uppercase">ATT&amp;CK techniques (design intent)</p>
+              <p className="text-xs font-medium tracking-wide text-subtle uppercase">ATT&amp;CK techniques (design intent)</p>
               <ul className="mt-1 flex flex-wrap gap-1.5">
                 {rule.techniques.map((x) => (
                   <li key={x.id} className="rounded bg-raised px-1.5 py-0.5 text-xs text-muted ring-1 ring-line" title={x.tactic ?? undefined}>
@@ -72,7 +72,7 @@ function RuleCard({ rule }: { rule: RuleRow }) {
             </p>
           </div>
           <div>
-            <p className="text-[11px] font-medium tracking-wide text-subtle uppercase">Labelled fixture evaluation</p>
+            <p className="text-xs font-medium tracking-wide text-subtle uppercase">Labelled fixture evaluation</p>
             {!t ? (
               <p className="mt-1 text-xs text-muted">{rule.fixture_count} labelled cases available. Run the self-test to record results.</p>
             ) : (
@@ -87,7 +87,7 @@ function RuleCard({ rule }: { rule: RuleRow }) {
                     ] as const
                   ).map(([k, v]) => (
                     <div key={k} className="rounded-md border border-line bg-raised/40 py-1.5">
-                      <p className="text-[11px] text-subtle">{k}</p>
+                      <p className="text-xs text-subtle">{k}</p>
                       <p className="text-sm font-semibold text-fg tabular-nums">{v}</p>
                     </div>
                   ))}

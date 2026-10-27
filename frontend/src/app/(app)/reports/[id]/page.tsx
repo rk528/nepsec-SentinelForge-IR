@@ -106,7 +106,7 @@ export default function ReportPage() {
         </header>
 
         <Section title="Summary">
-          <p className="text-[13px] whitespace-pre-wrap text-fg">{inc.summary || "No summary recorded."}</p>
+          <p className="text-sm whitespace-pre-wrap text-fg">{inc.summary || "No summary recorded."}</p>
           <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 text-xs sm:grid-cols-3">
             {(["created_at", "acknowledged_at", "contained_at", "resolved_at", "closed_at"] as const).map((k) => (
               <div key={k}>
@@ -202,7 +202,7 @@ export default function ReportPage() {
             <div className="space-y-3">
               {r.analyst_assessment.map((n, i) => (
                 <blockquote key={i} className="border-l-2 border-accent/50 pl-3">
-                  <p className="text-[13px] whitespace-pre-wrap text-fg">{n.text}</p>
+                  <p className="text-sm whitespace-pre-wrap text-fg">{n.text}</p>
                   <footer className="mt-1 text-xs text-subtle">{n.author ?? "Unknown"} · {n.type} · {formatDateTime(n.at)}</footer>
                 </blockquote>
               ))}
@@ -227,7 +227,7 @@ export default function ReportPage() {
 
         <Section title="Closure">
           <p className="text-xs text-muted">Verdict: <VerdictBadge verdict={inc.verdict} /></p>
-          <p className="mt-2 text-[13px] whitespace-pre-wrap text-fg">{inc.closure_reason ?? "The incident is not closed."}</p>
+          <p className="mt-2 text-sm whitespace-pre-wrap text-fg">{inc.closure_reason ?? "The incident is not closed."}</p>
         </Section>
 
         <Section title="Limitations">

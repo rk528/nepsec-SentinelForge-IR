@@ -89,23 +89,23 @@ export function BarList({ items, emptyText }: { items: { key: string; label: Rea
   const max = Math.max(1, ...items.map((i) => i.value));
   if (items.length === 0 || items.every((i) => i.value === 0)) return <EmptyState title="Nothing to show" description={emptyText} />;
   return (
-    <ul className="space-y-2">
+    <ul className="space-y-3">
       {items.map((item) => {
         const content = (
           <>
-            <div className="flex items-center justify-between gap-3 text-xs">
-              <span className="truncate text-fg">{item.label}</span>
-              <span className="text-muted tabular-nums">{item.value.toLocaleString()}</span>
+            <div className="flex items-start justify-between gap-3 text-sm">
+              <span className="min-w-0 leading-snug text-fg">{item.label}</span>
+              <span className="shrink-0 font-medium text-fg tabular-nums">{item.value.toLocaleString()}</span>
             </div>
-            <div className="mt-1 h-1.5 rounded-full bg-raised">
-              <div className="h-1.5 rounded-full" style={{ width: `${(item.value / max) * 100}%`, background: item.color ?? "var(--color-accent)" }} />
+            <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-raised">
+              <div className="h-2 rounded-full" style={{ width: `${(item.value / max) * 100}%`, background: item.color ?? "var(--color-accent)" }} />
             </div>
           </>
         );
         return (
           <li key={item.key}>
             {item.href ? (
-              <Link href={item.href} className="block rounded-md p-1 -m-1 hover:bg-raised/60">
+              <Link href={item.href} className="-m-1.5 block rounded-md p-1.5 hover:bg-raised/60">
                 {content}
               </Link>
             ) : (

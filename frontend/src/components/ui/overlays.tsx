@@ -114,7 +114,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div key={t.id} role={t.kind === "error" ? "alert" : "status"} className="pointer-events-auto flex items-start gap-3 rounded-lg border border-line-strong bg-overlay px-3.5 py-3 shadow-xl animate-slide-up">
             <span className="mt-0.5">{icon[t.kind]}</span>
             <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-medium text-fg">{t.title}</p>
+              <p className="text-sm font-medium text-fg">{t.title}</p>
               {t.description && <p className="mt-0.5 text-xs break-words text-muted">{t.description}</p>}
             </div>
             <button type="button" onClick={() => dismiss(t.id)} className="rounded p-0.5 text-subtle hover:text-fg" aria-label="Dismiss notification">

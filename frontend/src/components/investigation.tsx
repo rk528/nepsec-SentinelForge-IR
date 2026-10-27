@@ -61,12 +61,12 @@ export function EventDialog({ event, onClose }: { event: EventRecord | null; onC
           <KeyValue items={eventFields(event)} />
           {event.command_line && (
             <div>
-              <p className="mb-1 text-[11px] font-medium tracking-wide text-subtle uppercase">Command line</p>
+              <p className="mb-1 text-xs font-medium tracking-wide text-subtle uppercase">Command line</p>
               <JsonViewer value={event.command_line} maxHeight="8rem" />
             </div>
           )}
           <div>
-            <p className="mb-1 text-[11px] font-medium tracking-wide text-subtle uppercase">Raw payload (untrusted)</p>
+            <p className="mb-1 text-xs font-medium tracking-wide text-subtle uppercase">Raw payload (untrusted)</p>
             {event.raw ? <JsonViewer value={event.raw} maxHeight="14rem" /> : <p className="text-xs text-muted">Raw payloads are visible to analysts and above.</p>}
           </div>
           <Link href={`/events/${event.id}`} className="inline-flex items-center gap-1 text-xs text-accent hover:underline">
@@ -84,10 +84,10 @@ export function EventList({ events, empty = "No events linked." }: { events: Eve
   return (
     <>
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-[13px]">
+        <table className="w-full text-left text-sm">
           <caption className="sr-only">Events</caption>
           <thead>
-            <tr className="border-b border-line text-[11px] tracking-wide text-subtle uppercase">
+            <tr className="border-b border-line text-xs tracking-wide text-subtle uppercase">
               <th scope="col" className="h-8 pr-3 pl-4 font-medium">Time</th>
               <th scope="col" className="px-3 font-medium">Type</th>
               <th scope="col" className="px-3 font-medium">Host</th>
@@ -139,7 +139,7 @@ export function Timeline({ items }: { items: TimelineItem[] }) {
         const quiet = item.kind === "event";
         return (
           <li key={`${item.ref_id}-${idx}`}>
-            {showDay && <p className="sticky top-0 z-10 bg-surface py-1.5 text-[11px] font-medium tracking-wide text-subtle uppercase">{new Date(item.at).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</p>}
+            {showDay && <p className="sticky top-0 z-10 bg-surface py-1.5 text-xs font-medium tracking-wide text-subtle uppercase">{new Date(item.at).toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric", year: "numeric" })}</p>}
             <div className="relative flex gap-3 pb-3 pl-1">
               <span aria-hidden className="absolute top-6 bottom-0 left-[13px] w-px bg-line" />
               <span className={cn("relative z-[1] mt-0.5 grid size-6 shrink-0 place-items-center rounded-full border border-line bg-raised", k.cls)}>
@@ -147,11 +147,11 @@ export function Timeline({ items }: { items: TimelineItem[] }) {
               </span>
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-baseline gap-x-2">
-                  <span className="mono text-[11px] text-subtle" title={utcTitle(item.at)}>
+                  <span className="mono text-xs text-subtle" title={utcTitle(item.at)}>
                     {formatTime(item.at)}
                   </span>
                   <span className="sr-only">{k.label}:</span>
-                  <span className={cn("text-[13px]", quiet ? "text-muted" : "text-fg")}>{item.title}</span>
+                  <span className={cn("text-sm", quiet ? "text-muted" : "text-fg")}>{item.title}</span>
                   {item.severity && <SeverityBadge severity={item.severity} />}
                 </div>
                 {(item.detail || item.actor) && (
@@ -185,14 +185,14 @@ export function EvidenceList({ items }: { items: EvidenceItem[] }) {
           <li key={e.id} className="flex items-start gap-3 px-4 py-3">
             <ShieldCheck className="mt-0.5 size-4 shrink-0 text-ok" aria-hidden />
             <div className="min-w-0 flex-1">
-              <button type="button" onClick={() => setOpen(e)} className="text-left text-[13px] font-medium text-fg hover:underline">
+              <button type="button" onClick={() => setOpen(e)} className="text-left text-sm font-medium text-fg hover:underline">
                 {e.title}
               </button>
               <p className="mt-0.5 text-xs text-subtle">
                 {humanize(e.evidence_type)} · {String(e.provenance.method ?? "unknown method")} · <span title={utcTitle(e.created_at)}>{formatDateTime(e.created_at)}</span>
               </p>
             </div>
-            <span className="mono hidden text-[11px] text-subtle sm:block" title={`SHA-256 ${e.sha256}`}>
+            <span className="mono hidden text-xs text-subtle sm:block" title={`SHA-256 ${e.sha256}`}>
               sha256:{e.sha256.slice(0, 10)}…
             </span>
           </li>
@@ -201,7 +201,7 @@ export function EvidenceList({ items }: { items: EvidenceItem[] }) {
       <Dialog open={!!open} onOpenChange={(o) => !o && setOpen(null)} title={open?.title ?? "Evidence"} description="Immutable record. The hash covers the content below." size="lg">
         {open && (
           <div className="space-y-4">
-            {open.description && <p className="text-[13px] text-muted">{open.description}</p>}
+            {open.description && <p className="text-sm text-muted">{open.description}</p>}
             <KeyValue
               items={[
                 { label: "Type", value: humanize(open.evidence_type) },
@@ -211,11 +211,11 @@ export function EvidenceList({ items }: { items: EvidenceItem[] }) {
               ]}
             />
             <div>
-              <p className="mb-1 text-[11px] font-medium tracking-wide text-subtle uppercase">Provenance</p>
+              <p className="mb-1 text-xs font-medium tracking-wide text-subtle uppercase">Provenance</p>
               <JsonViewer value={open.provenance} maxHeight="10rem" />
             </div>
             <div>
-              <p className="mb-1 text-[11px] font-medium tracking-wide text-subtle uppercase">Content</p>
+              <p className="mb-1 text-xs font-medium tracking-wide text-subtle uppercase">Content</p>
               {typeof open.content.markdown === "string" ? (
                 <pre className="mono max-h-80 overflow-auto rounded-md border border-line bg-canvas p-3 text-[12px] whitespace-pre-wrap text-muted">{open.content.markdown}</pre>
               ) : (

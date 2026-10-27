@@ -15,31 +15,37 @@ import { ALERT_STATUS_OPTIONS, SEVERITY_OPTIONS } from "@/lib/options";
 import type { Alert, Page, RuleRow } from "@/lib/types";
 
 const columns: Column<Alert>[] = [
-  { key: "severity", header: "Severity", sortKey: "severity", render: (a) => <SeverityBadge severity={a.severity} />, className: "w-28" },
+  { key: "severity", header: "Severity", sortKey: "severity", hideBelow: "sm", render: (a) => <SeverityBadge severity={a.severity} />, className: "w-28" },
   {
     key: "title",
     header: "Alert",
     render: (a) => (
-      <div className="min-w-0 py-1.5">
-        <Link href={`/alerts/${a.id}`} className="block truncate font-medium text-fg hover:underline">
+      <div className="min-w-0 py-0.5">
+        <Link href={`/alerts/${a.id}`} className="block leading-snug font-medium text-fg hover:underline lg:truncate">
           {a.title}
         </Link>
-        <p className="truncate text-xs text-subtle">
+        <p className="mt-0.5 text-xs text-muted lg:truncate">
           <span className="mono">{a.rule_id}</span> · {a.rule_name}
         </p>
+        {/* On phones severity, status and timing collapse into this cell. */}
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 sm:hidden">
+          <SeverityBadge severity={a.severity} />
+          <AlertStatusBadge status={a.status} />
+          <span className="text-xs text-muted">{relativeTime(a.last_seen)}</span>
+        </div>
       </div>
     ),
     className: "max-w-[30rem]",
   },
   { key: "confidence", header: "Confidence", hideBelow: "lg", render: (a) => <ConfidenceMeter confidence={a.confidence} /> },
-  { key: "status", header: "Status", render: (a) => <AlertStatusBadge status={a.status} />, className: "w-32" },
+  { key: "status", header: "Status", hideBelow: "sm", render: (a) => <AlertStatusBadge status={a.status} />, className: "w-32" },
   {
     key: "incident",
     header: "Incident",
     hideBelow: "md",
     render: (a) =>
       a.incident_id ? (
-        <Link href={`/incidents/${a.incident_id}`} className="mono text-xs text-accent hover:underline">
+        <Link href={`/incidents/${a.incident_id}`} className="mono text-xs whitespace-nowrap text-accent hover:underline">
           INC-{String(a.incident_number ?? 0).padStart(4, "0")}
         </Link>
       ) : (
@@ -47,8 +53,8 @@ const columns: Column<Alert>[] = [
       ),
   },
   { key: "count", header: "Events", sortKey: "occurrence_count", hideBelow: "md", render: (a) => <span className="text-xs text-muted tabular-nums">{a.occurrence_count}</span> },
-  { key: "first", header: "First seen", sortKey: "first_seen", hideBelow: "lg", render: (a) => <span className="text-xs text-subtle" title={utcTitle(a.first_seen)}>{relativeTime(a.first_seen)}</span> },
-  { key: "last", header: "Last seen", sortKey: "last_seen", render: (a) => <span className="text-xs text-subtle" title={utcTitle(a.last_seen)}>{relativeTime(a.last_seen)}</span>, className: "w-24" },
+  { key: "first", header: "First seen", sortKey: "first_seen", hideBelow: "lg", render: (a) => <span className="text-sm whitespace-nowrap text-muted" title={utcTitle(a.first_seen)}>{relativeTime(a.first_seen)}</span> },
+  { key: "last", header: "Last seen", sortKey: "last_seen", hideBelow: "sm", render: (a) => <span className="text-sm whitespace-nowrap text-muted" title={utcTitle(a.last_seen)}>{relativeTime(a.last_seen)}</span>, className: "w-24" },
 ];
 
 const RANGES = [

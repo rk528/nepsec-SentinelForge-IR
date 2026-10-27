@@ -58,68 +58,75 @@ function LoginForm() {
     }
   }
 
+  // Layout follows the shadcn/ui "login-03" block: centred brand, a welcome card,
+  // and an "Or continue with" divider leading to the alternative sign-in options.
   return (
-    <div className="w-full max-w-sm">
-      <div className="mb-8 flex items-center gap-3">
-        <span className="text-accent">
-          <LogoMark className="size-9" />
+    <div className="flex w-full max-w-sm flex-col gap-6">
+      <div className="flex items-center gap-2 self-center font-medium">
+        <span className="grid size-8 place-items-center rounded-lg bg-accent text-accent-fg">
+          <LogoMark className="size-5" />
         </span>
-        <div>
-          <h1 className="text-base font-semibold tracking-tight text-fg">SentinelForge IR</h1>
-          <p className="text-xs text-muted">Incident response and security engineering</p>
+        <span className="text-fg">SentinelForge IR</span>
+      </div>
+
+      <div className="rounded-xl border border-line bg-surface shadow-sm">
+        <div className="space-y-1.5 px-6 pt-6 text-center">
+          <h1 className="text-xl font-semibold text-fg">Welcome back</h1>
+          <p className="text-sm text-muted">Sign in to your incident response workspace</p>
+        </div>
+        <div className="p-6">
+          <form onSubmit={handleSubmit(onSubmit)} noValidate className="grid gap-5">
+            <Field label="Email" htmlFor="email" error={errors.email?.message}>
+              <Input id="email" type="email" autoComplete="username" placeholder="you@company.com" aria-invalid={!!errors.email} {...register("email")} />
+            </Field>
+            <Field label="Password" htmlFor="password" error={errors.password?.message}>
+              <Input id="password" type="password" autoComplete="current-password" aria-invalid={!!errors.password} {...register("password")} />
+            </Field>
+            {serverError && (
+              <p role="alert" className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger">
+                {serverError}
+              </p>
+            )}
+            <Button type="submit" variant="primary" className="w-full" loading={isSubmitting}>
+              Sign in
+            </Button>
+          </form>
+
+          {config?.demo_mode && (
+            <>
+              <div className="relative my-6 text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:border-t after:border-line">
+                <span className="relative z-10 bg-surface px-2 text-muted">Or explore the synthetic demo</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {(
+                  [
+                    { role: "analyst", label: "Analyst", icon: ShieldCheck },
+                    { role: "lead", label: "Lead", icon: UserCog },
+                    { role: "viewer", label: "Viewer", icon: Eye },
+                  ] as const
+                ).map(({ role, label, icon: Icon }) => (
+                  <Button key={role} loading={demoBusy === role} disabled={!!demoBusy} onClick={() => demo(role)} icon={<Icon className="size-4" aria-hidden />}>
+                    {label}
+                  </Button>
+                ))}
+              </div>
+              <p className="mt-4 flex gap-2 text-xs text-muted">
+                <FlaskConical className="mt-px size-3.5 shrink-0 text-accent" aria-hidden />
+                <span>No password needed. Every record is synthetic, response actions are simulated and administration is disabled. Sign in as Lead to approve the analyst&apos;s pending firewall block.</span>
+              </p>
+            </>
+          )}
         </div>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4 rounded-xl border border-line bg-surface p-5">
-        <h2 className="text-sm font-semibold text-fg">Sign in</h2>
-        <Field label="Email" htmlFor="email" error={errors.email?.message}>
-          <Input id="email" type="email" autoComplete="username" aria-invalid={!!errors.email} {...register("email")} />
-        </Field>
-        <Field label="Password" htmlFor="password" error={errors.password?.message}>
-          <Input id="password" type="password" autoComplete="current-password" aria-invalid={!!errors.password} {...register("password")} />
-        </Field>
-        {serverError && (
-          <p role="alert" className="rounded-md border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">
-            {serverError}
-          </p>
-        )}
-        <Button type="submit" variant="primary" className="w-full" loading={isSubmitting}>
-          Sign in
-        </Button>
-      </form>
-
-      {config?.demo_mode && (
-        <div className="mt-5 rounded-xl border border-accent/25 bg-accent-soft/40 p-5">
-          <div className="flex items-start gap-2.5">
-            <FlaskConical className="mt-0.5 size-4 shrink-0 text-accent" aria-hidden />
-            <div>
-              <h2 className="text-[13px] font-semibold text-fg">Explore the synthetic demo</h2>
-              <p className="mt-1 text-xs text-muted">No password needed. Every record is synthetic and response actions are simulated. Administrative functions are disabled.</p>
-            </div>
-          </div>
-          <div className="mt-4 grid grid-cols-3 gap-2">
-            {(
-              [
-                { role: "analyst", label: "Analyst", icon: ShieldCheck },
-                { role: "lead", label: "Lead", icon: UserCog },
-                { role: "viewer", label: "Viewer", icon: Eye },
-              ] as const
-            ).map(({ role, label, icon: Icon }) => (
-              <Button key={role} size="sm" loading={demoBusy === role} disabled={!!demoBusy} onClick={() => demo(role)} icon={<Icon className="size-3.5" aria-hidden />}>
-                {label}
-              </Button>
-            ))}
-          </div>
-          <p className="mt-3 text-[11px] text-subtle">Tip: sign in as Lead to approve the analyst&apos;s pending firewall block. Leads cannot approve their own requests.</p>
-        </div>
-      )}
+      <p className="text-center text-xs text-balance text-muted">Accounts are created by your administrator. Sessions expire after 12 hours or 2 hours idle.</p>
     </div>
   );
 }
 
 export default function LoginPage() {
   return (
-    <main className="grid min-h-dvh place-items-center bg-canvas px-4 py-12">
+    <main className="flex min-h-dvh flex-col items-center justify-center bg-shell px-4 py-12 md:px-10">
       <Suspense>
         <LoginForm />
       </Suspense>

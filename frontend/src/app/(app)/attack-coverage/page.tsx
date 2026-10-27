@@ -74,10 +74,10 @@ export default function AttackCoveragePage() {
                     return (
                       <div key={t.technique} className={cn("rounded-md border p-2.5", c.cell)}>
                         <div className="flex items-start justify-between gap-2">
-                          <a href={`https://attack.mitre.org/techniques/${t.technique.replace(".", "/")}/`} target="_blank" rel="noopener noreferrer" className="text-[13px] text-fg hover:underline">
+                          <a href={`https://attack.mitre.org/techniques/${t.technique.replace(".", "/")}/`} target="_blank" rel="noopener noreferrer" className="text-sm text-fg hover:underline">
                             <span className="mono text-xs text-muted">{t.technique}</span> {t.name}
                           </a>
-                          <span className="inline-flex shrink-0 items-center gap-1 text-[11px] text-muted">
+                          <span className="inline-flex shrink-0 items-center gap-1 text-xs text-muted">
                             <StatusDot className={c.dot} />
                             <span className="sr-only">{c.label}</span>
                           </span>

@@ -49,7 +49,7 @@ function ProviderCard({ e, providers }: { e: Enrichment; providers: Provider[] }
     <div className="rounded-lg border border-line bg-raised/30 p-3.5">
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-[13px] font-medium text-fg">{e.provider_label ?? p?.label ?? e.provider}</p>
+          <p className="text-sm font-medium text-fg">{e.provider_label ?? p?.label ?? e.provider}</p>
           <p className="mt-0.5 inline-flex items-center gap-1.5 text-xs text-muted">
             <StatusDot className={e.status === "ok" ? "bg-ok" : e.status === "not_found" ? "bg-info" : e.status === "unconfigured" || e.status === "unsupported" ? "bg-subtle" : "bg-warn"} />
             {STATUS_TEXT[e.status] ?? e.status}
@@ -78,7 +78,7 @@ function ProviderCard({ e, providers }: { e: Enrichment; providers: Provider[] }
         </a>
       )}
       {(e.fetched_at || p) && (
-        <p className="mt-3 flex flex-wrap items-center gap-x-2 text-[11px] text-subtle">
+        <p className="mt-3 flex flex-wrap items-center gap-x-2 text-xs text-subtle">
           {e.fetched_at && (
             <span title={utcTitle(e.fetched_at)}>
               {e.cached ? "Cached result from" : "Looked up"} {formatDateTime(e.fetched_at)}
@@ -169,7 +169,7 @@ function IndicatorView({ id, providers }: { id: string; providers: Provider[] })
             <h3 id="ana-h" className="mb-2 flex items-center gap-1.5 text-xs font-medium tracking-wide text-subtle uppercase">
               <UserCheck className="size-3.5" aria-hidden /> Analyst conclusion
             </h3>
-            {canEdit ? <VerdictForm key={indicator.id} indicator={indicator} /> : <p className="text-[13px] text-fg">{indicator.analyst_note ?? "No conclusion recorded."}</p>}
+            {canEdit ? <VerdictForm key={indicator.id} indicator={indicator} /> : <p className="text-sm text-fg">{indicator.analyst_note ?? "No conclusion recorded."}</p>}
           </section>
         </div>
       </Panel>
@@ -210,7 +210,7 @@ function IndicatorView({ id, providers }: { id: string; providers: Provider[] })
           {linked_incidents.length + local.incidents_with_matching_evidence.length === 0 ? (
             <p className="text-xs text-muted">No related incidents.</p>
           ) : (
-            <ul className="space-y-1.5 text-[13px]">
+            <ul className="space-y-1.5 text-sm">
               {[...linked_incidents, ...local.incidents_with_matching_evidence.filter((i) => !linked_incidents.some((l) => l.id === i.id))].map((i) => (
                 <li key={i.id}>
                   <Link href={`/incidents/${i.id}`} className="hover:underline">
@@ -281,10 +281,23 @@ function ThreatIntel() {
   }
 
   const columns: Column<Indicator>[] = [
-    { key: "value", header: "Indicator", render: (i) => <button type="button" onClick={() => url.set({ id: i.id }, { resetPage: false })} className={cn("mono max-w-xs truncate text-left text-xs hover:underline", i.id === selected ? "text-accent" : "text-fg")}>{i.value}</button> },
-    { key: "type", header: "Type", render: (i) => <span className="text-xs text-muted uppercase">{i.ioc_type}</span> },
-    { key: "verdict", header: "Analyst verdict", render: (i) => <IntelVerdictBadge verdict={i.analyst_verdict} /> },
-    { key: "last", header: "Last lookup", hideBelow: "md", render: (i) => <span className="text-xs text-subtle" title={utcTitle(i.last_looked_up)}>{relativeTime(i.last_looked_up)}</span> },
+    {
+      key: "value",
+      header: "Indicator",
+      // Type and last lookup sit under the value so the narrow history column never clips.
+      render: (i) => (
+        <div className="min-w-0">
+          <button type="button" onClick={() => url.set({ id: i.id }, { resetPage: false })} className={cn("mono block max-w-full truncate text-left text-xs hover:underline", i.id === selected ? "text-accent" : "text-fg")}>
+            {i.value}
+          </button>
+          <span className="mt-0.5 block text-xs text-muted" title={utcTitle(i.last_looked_up)}>
+            <span className="uppercase">{i.ioc_type}</span> · {relativeTime(i.last_looked_up)}
+          </span>
+        </div>
+      ),
+      className: "max-w-0 w-full",
+    },
+    { key: "verdict", header: "Verdict", render: (i) => <IntelVerdictBadge verdict={i.analyst_verdict} />, className: "w-px whitespace-nowrap" },
   ];
 
   return (
@@ -293,7 +306,7 @@ function ThreatIntel() {
         title="Threat intelligence"
         description="Investigate IPs, domains, URLs and file hashes. Provider findings, locally observed evidence and analyst conclusions are shown separately."
         meta={providers.data?.map((p) => (
-          <span key={p.name} className="inline-flex items-center gap-1.5 rounded border border-line px-1.5 py-px text-[11px] text-muted">
+          <span key={p.name} className="inline-flex items-center gap-1.5 rounded border border-line px-1.5 py-px text-xs text-muted">
             <StatusDot className={p.configured ? "bg-ok" : "bg-subtle"} /> {p.label}: {p.configured ? "configured" : "not configured"}
           </span>
         ))}
@@ -355,7 +368,7 @@ function ThreatIntel() {
             )}
           </Panel>
         </div>
-        <p className="flex items-center gap-1 text-[11px] text-subtle">
+        <p className="flex items-center gap-1 text-xs text-subtle">
           Provider data is subject to each provider&apos;s terms and quotas. <Link href="/settings" className="inline-flex items-center gap-0.5 hover:text-fg">Integration status <ArrowUpRight className="size-3" aria-hidden /></Link>
         </p>
       </div>

@@ -1,6 +1,13 @@
 # Design system
 
-Informed by the research in [ui-research.md](ui-research.md). Tokens live in
+The visual system is adopted from **[shadcn/ui](https://ui.shadcn.com)** (MIT licence):
+its `zinc` dark theme with the `violet` accent, its `dashboard-01` block (sidebar-inset
+layout, `SectionCards` KPI tiles, data table styling) and its `login-03` block. The
+template's component specifications (button and input sizes, card header, outline badges,
+outline toggle groups, sidebar menu buttons, user menu in the sidebar footer) are
+re-implemented on this project's existing components, so behaviour, accessibility and tests
+are unchanged. Product-specific patterns (severity glyphs, provenance, synthetic labels)
+come from the research in [ui-research.md](ui-research.md). Tokens live in
 `frontend/src/app/globals.css` (Tailwind v4 `@theme`); components live in
 `frontend/src/components/ui`.
 
@@ -17,14 +24,15 @@ Informed by the research in [ui-research.md](ui-research.md). Tokens live in
 
 | Token | Value | Use |
 |---|---|---|
-| `canvas` / `surface` / `raised` / `overlay` | `#0b0c10` / `#111319` / `#161922` / `#1c202b` | Elevation steps |
-| `line` / `line-strong` | `#232836` / `#30364a` | Borders |
-| `fg` / `muted` / `subtle` | `#e7e9ef` / `#a0a7b8` / `#858ca2` | Text; `subtle` meets 4.5:1 on all surfaces |
-| `accent` | `#8b7cf6` | Primary actions, focus, selection |
+| `shell` | `#131316` | Sidebar and page background around the inset main area |
+| `canvas` / `surface` / `raised` / `overlay` | `#09090b` / `#131316` / `#1b1b1f` / `#222227` | Inset main area, cards, hover/selected, menus |
+| `line` / `line-strong` | `#232328` / `#2f2f36` | Borders |
+| `fg` / `muted` / `subtle` | `#fafafa` / `#a1a1aa` / `#8c8c96` | Text (zinc); all meet 4.5:1 on every surface (axe-verified) |
+| `accent` | `#a78bfa` | shadcn violet: primary actions, focus ring, selection |
 | `sev-critical/high/medium/low/info` | `#f0506e` / `#f59e42` / `#e7c04a` / `#5aa9e6` / `#8a93a6` | Severity only |
 | `ok` / `warn` / `danger` / `info` / `teal` | | Status |
-| Radii | 4 / 6 / 8 / 12 px | Controls use 6 px |
-| Type | Inter (UI), JetBrains Mono (IPs, hashes, IDs, commands) | Body 14 px, tables 13 px |
+| Radii | 6 / 8 / 10 / 14 px | shadcn scale (`--radius` 0.625rem); controls 8 px, cards 14 px |
+| Type | Inter (UI), JetBrains Mono (IPs, hashes, IDs, commands) | Body and tables 14 px (`text-sm`), page titles 24 px |
 
 ## Components
 

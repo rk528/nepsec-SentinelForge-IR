@@ -15,7 +15,7 @@ import { useUrlState } from "@/lib/hooks";
 import type { Incident, Page } from "@/lib/types";
 
 const columns: Column<Incident>[] = [
-  { key: "ref", header: "Ref", render: (i) => <span className="mono text-xs text-muted">{i.reference}</span>, className: "w-24" },
+  { key: "ref", header: "Ref", render: (i) => <span className="mono text-xs whitespace-nowrap text-muted">{i.reference}</span>, className: "w-24 whitespace-nowrap" },
   {
     key: "title",
     header: "Incident",

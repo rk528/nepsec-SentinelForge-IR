@@ -38,7 +38,7 @@ export default function PlaybooksPage() {
                     <li key={p.id} className="flex flex-col gap-2 px-4 py-3 md:flex-row md:items-start md:gap-4">
                       <Workflow className="mt-0.5 hidden size-4 shrink-0 text-subtle md:block" aria-hidden />
                       <div className="min-w-0 flex-1">
-                        <p className="flex flex-wrap items-center gap-2 text-[13px] font-medium text-fg">
+                        <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-fg">
                           {p.name} <span className="mono text-xs font-normal text-subtle">{p.id}</span>
                           {p.simulated && <SimulatedBadge />}
                         </p>

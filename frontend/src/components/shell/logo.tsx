@@ -10,15 +10,16 @@ export function LogoMark({ className = "size-6" }: { className?: string }) {
 }
 
 export function Logo({ collapsed }: { collapsed?: boolean }) {
+  // Laid out like the shadcn/ui sidebar "team switcher" header.
   return (
-    <span className="flex items-center gap-2.5">
-      <span className="text-accent">
-        <LogoMark />
+    <span className="flex items-center gap-2">
+      <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent text-accent-fg">
+        <LogoMark className="size-5" />
       </span>
       {!collapsed && (
-        <span className="leading-none">
-          <span className="block text-[13px] font-semibold tracking-tight text-fg">SentinelForge</span>
-          <span className="block text-[10px] font-medium tracking-[0.14em] text-subtle uppercase">Incident Response</span>
+        <span className="grid text-left leading-tight">
+          <span className="truncate text-sm font-semibold text-fg">SentinelForge</span>
+          <span className="truncate text-xs text-muted">Incident response</span>
         </span>
       )}
     </span>

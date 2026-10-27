@@ -8,24 +8,29 @@
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, "SFMono-Regular", Consolas, monospace;
 
-  /* Surfaces (elevation increases with lightness) */
-  --color-canvas: #0b0c10;
-  --color-surface: #111319;
-  --color-raised: #161922;
-  --color-overlay: #1c202b;
-  --color-line: #232836;
-  --color-line-strong: #30364a;
+  /*
+   * Palette from the shadcn/ui "zinc" dark theme with its violet accent
+   * (ui.shadcn.com/themes, MIT): the sidebar sits on --color-shell, pages on
+   * --color-canvas inside an inset, rounded main area (shadcn "sidebar inset").
+   */
+  --color-shell: #131316;
+  --color-canvas: #09090b;
+  --color-surface: #131316;
+  --color-raised: #1b1b1f;
+  --color-overlay: #222227;
+  --color-line: #232328;
+  --color-line-strong: #2f2f36;
 
   /* Text */
-  --color-fg: #e7e9ef;
-  --color-muted: #a0a7b8;
-  --color-subtle: #858ca2;
+  --color-fg: #fafafa;
+  --color-muted: #a1a1aa;
+  --color-subtle: #8c8c96;
 
-  /* Brand accent: actions, focus, selection */
-  --color-accent: #8b7cf6;
-  --color-accent-hover: #a094f8;
-  --color-accent-fg: #0b0c10;
-  --color-accent-soft: rgb(139 124 246 / 0.14);
+  /* Brand accent: actions, focus, selection (shadcn violet) */
+  --color-accent: #a78bfa;
+  --color-accent-hover: #c4b5fd;
+  --color-accent-fg: #0f0a1f;
+  --color-accent-soft: rgb(167 139 250 / 0.12);
 
   /* Severity ramp (always paired with a text label) */
   --color-sev-critical: #f0506e;
@@ -41,10 +46,11 @@
   --color-info: #5aa9e6;
   --color-teal: #2dd4bf;
 
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 8px;
-  --radius-xl: 12px;
+  /* shadcn radius scale (--radius: 0.625rem) */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
 
   --animate-fade-in: fade-in 160ms ease-out;
   --animate-slide-up: slide-up 180ms ease-out;
@@ -61,10 +67,10 @@
 @layer base {
   html {
     color-scheme: dark;
-    background: var(--color-canvas);
+    background: var(--color-shell);
   }
   body {
-    background: var(--color-canvas);
+    background: var(--color-shell);
     color: var(--color-fg);
     font-family: var(--font-sans);
     font-size: 14px;
@@ -73,7 +79,7 @@
     font-feature-settings: "cv11", "ss01";
   }
   ::selection {
-    background: rgb(139 124 246 / 0.35);
+    background: rgb(167 139 250 / 0.35);
   }
   :focus-visible {
     outline: 2px solid var(--color-accent);

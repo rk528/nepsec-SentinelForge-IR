@@ -26,7 +26,7 @@ export function SeverityBadge({ severity, compact }: { severity: Severity; compa
   const s = SEVERITY[severity] ?? SEVERITY.informational;
   const rank = SEVERITY_ORDER.length - SEVERITY_ORDER.indexOf(severity);
   return (
-    <span className={cn("inline-flex items-center gap-1.5 rounded border px-1.5 py-px text-[11px] font-medium", s.cls)}>
+    <span className={cn("inline-flex w-fit shrink-0 items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-medium whitespace-nowrap", s.cls)}>
       <span aria-hidden className="flex h-2.5 items-end gap-px">
         {[1, 2, 3, 4].map((i) => (
           <span key={i} className={cn("w-[2px] rounded-sm", i <= rank - 1 ? s.dot : "bg-current opacity-25")} style={{ height: `${i * 2 + 2}px` }} />
@@ -53,7 +53,7 @@ export function StatusDot({ className }: { className: string }) {
 export function IncidentStatusBadge({ status }: { status: IncidentStatus }) {
   const s = INCIDENT_STATUS[status];
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-fg">
+    <span className="inline-flex w-fit shrink-0 items-center gap-1.5 rounded-md border border-line-strong px-2 py-0.5 text-xs font-medium whitespace-nowrap text-fg">
       <StatusDot className={s.dot} />
       {s.label}
     </span>
@@ -70,7 +70,7 @@ const ALERT_STATUS: Record<AlertStatus, { label: string; dot: string }> = {
 export function AlertStatusBadge({ status }: { status: AlertStatus }) {
   const s = ALERT_STATUS[status];
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-fg">
+    <span className="inline-flex w-fit shrink-0 items-center gap-1.5 rounded-md border border-line-strong px-2 py-0.5 text-xs font-medium whitespace-nowrap text-fg">
       <StatusDot className={s.dot} />
       {s.label}
     </span>
@@ -87,7 +87,7 @@ const VERDICT: Record<Verdict, { label: string; cls: string }> = {
 export function VerdictBadge({ verdict }: { verdict: Verdict | null }) {
   if (!verdict) return <span className="text-xs text-subtle">Not set</span>;
   const v = VERDICT[verdict];
-  return <span className={cn("inline-flex rounded border px-1.5 py-px text-[11px] font-medium", v.cls)}>{v.label}</span>;
+  return <span className={cn("inline-flex w-fit shrink-0 rounded-md border px-2 py-0.5 text-xs font-medium whitespace-nowrap", v.cls)}>{v.label}</span>;
 }
 
 export const VERDICT_OPTIONS: { value: Verdict; label: string; help: string }[] = [
@@ -113,12 +113,12 @@ export function ConfidenceMeter({ confidence }: { confidence: Confidence }) {
 }
 
 export function Tag({ children }: { children: ReactNode }) {
-  return <span className="inline-flex items-center rounded bg-raised px-1.5 py-px text-[11px] text-muted ring-1 ring-line">{children}</span>;
+  return <span className="inline-flex items-center rounded-md border border-line-strong px-1.5 py-0.5 text-xs text-muted">{children}</span>;
 }
 
 export function SyntheticBadge() {
   return (
-    <span className="inline-flex items-center gap-1 rounded border border-accent/30 bg-accent-soft px-1.5 py-px text-[11px] font-medium text-accent" title="Generated demonstration data. Not a real event.">
+    <span className="inline-flex w-fit shrink-0 items-center gap-1 rounded-md border border-accent/30 bg-accent-soft px-1.5 py-0.5 text-xs font-medium text-accent" title="Generated demonstration data. Not a real event.">
       <FlaskConical className="size-3" aria-hidden />
       Synthetic
     </span>
@@ -126,7 +126,7 @@ export function SyntheticBadge() {
 }
 
 export function SimulatedBadge() {
-  return <span className="inline-flex rounded border border-teal/30 bg-teal/10 px-1.5 py-px text-[11px] font-medium text-teal">Simulated</span>;
+  return <span className="inline-flex w-fit rounded-md border border-teal/30 bg-teal/10 px-2 py-0.5 text-xs font-medium text-teal">Simulated</span>;
 }
 
 const PROVIDER_VERDICT: Record<string, string> = {
@@ -138,5 +138,5 @@ const PROVIDER_VERDICT: Record<string, string> = {
 };
 
 export function IntelVerdictBadge({ verdict }: { verdict: string }) {
-  return <span className={cn("inline-flex rounded border px-1.5 py-px text-[11px] font-medium capitalize", PROVIDER_VERDICT[verdict] ?? PROVIDER_VERDICT.unknown)}>{verdict}</span>;
+  return <span className={cn("inline-flex w-fit shrink-0 rounded-md border px-2 py-0.5 text-xs font-medium whitespace-nowrap capitalize", PROVIDER_VERDICT[verdict] ?? PROVIDER_VERDICT.unknown)}>{verdict}</span>;
 }

@@ -86,15 +86,21 @@ function NewIncidentDialog({ open, onOpenChange }: { open: boolean; onOpenChange
 }
 
 const columns: Column<Incident>[] = [
-  { key: "ref", header: "Ref", sortKey: "number", render: (i) => <span className="mono text-xs text-muted">{i.reference}</span>, className: "w-24" },
+  { key: "ref", header: "Ref", sortKey: "number", hideBelow: "sm", render: (i) => <span className="mono text-xs whitespace-nowrap text-muted">{i.reference}</span>, className: "w-24 whitespace-nowrap" },
   {
     key: "title",
     header: "Incident",
     render: (i) => (
-      <div className="min-w-0 py-1.5">
-        <Link href={`/incidents/${i.id}`} className="block truncate font-medium text-fg hover:underline">
+      <div className="py-0.5 sm:min-w-[15rem]">
+        <Link href={`/incidents/${i.id}`} className="block leading-snug font-medium text-fg hover:underline lg:truncate">
           {i.title}
         </Link>
+        {/* On phones the reference, severity and status columns collapse into this cell. */}
+        <div className="mt-1.5 flex flex-wrap items-center gap-1.5 sm:hidden">
+          <span className="mono text-xs text-muted">{i.reference}</span>
+          <SeverityBadge severity={i.severity} />
+          <IncidentStatusBadge status={i.status} />
+        </div>
         <div className="mt-0.5 flex flex-wrap items-center gap-1">
           {i.is_synthetic && <SyntheticBadge />}
           {i.tags.slice(0, 3).map((t) => (
@@ -105,11 +111,11 @@ const columns: Column<Incident>[] = [
     ),
     className: "max-w-[28rem]",
   },
-  { key: "severity", header: "Severity", sortKey: "severity", render: (i) => <SeverityBadge severity={i.severity} />, className: "w-28" },
-  { key: "status", header: "Status", render: (i) => <IncidentStatusBadge status={i.status} />, className: "w-32" },
-  { key: "assignee", header: "Assignee", hideBelow: "md", render: (i) => (i.assignee ? <span className="text-xs text-fg">{i.assignee.display_name}</span> : <span className="text-xs text-subtle">Unassigned</span>) },
-  { key: "evidence", header: "Evidence", hideBelow: "lg", render: (i) => <span className="text-xs text-muted tabular-nums">{plural(i.alert_count, "alert")} · {plural(i.event_count, "event")}</span> },
-  { key: "updated", header: "Updated", sortKey: "updated_at", hideBelow: "sm", render: (i) => <span className="text-xs text-subtle" title={utcTitle(i.updated_at)}>{relativeTime(i.updated_at)}</span>, className: "w-24" },
+  { key: "severity", header: "Severity", sortKey: "severity", hideBelow: "sm", render: (i) => <SeverityBadge severity={i.severity} />, className: "w-28" },
+  { key: "status", header: "Status", hideBelow: "sm", render: (i) => <IncidentStatusBadge status={i.status} />, className: "w-32" },
+  { key: "assignee", header: "Assignee", hideBelow: "md", render: (i) => (i.assignee ? <span className="text-sm whitespace-nowrap text-fg">{i.assignee.display_name}</span> : <span className="text-sm whitespace-nowrap text-muted">Unassigned</span>) },
+  { key: "evidence", header: "Evidence", hideBelow: "xl", render: (i) => <span className="text-sm whitespace-nowrap text-muted tabular-nums">{plural(i.alert_count, "alert")} · {plural(i.event_count, "event")}</span> },
+  { key: "updated", header: "Updated", sortKey: "updated_at", hideBelow: "sm", render: (i) => <span className="text-sm whitespace-nowrap text-muted" title={utcTitle(i.updated_at)}>{relativeTime(i.updated_at)}</span>, className: "w-24" },
 ];
 
 function Incidents() {
