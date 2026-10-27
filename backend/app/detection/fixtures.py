@@ -163,6 +163,20 @@ CASES: dict[str, list[Case]] = {
         Case("sysmon stopped", "malicious", [_ev(1, 0, "service.stopped", host="fin-ws-014", process_name="Sysmon64", user_name="SYSTEM")]),
         Case("print spooler stopped", "benign", [_ev(1, 0, "service.stopped", host="fin-ws-014", process_name="Spooler", user_name="it.admin")]),
     ],
+    "SF-EXT-001": [
+        Case(
+            "defender high alert",
+            "malicious",
+            [_ev(1, 0, "security.alert", host="fin-ws-014", outcome="high", message="Microsoft Defender for Endpoint: Suspicious PowerShell command line")],
+        ),
+        Case(
+            "entra id protection medium alert",
+            "malicious",
+            [_ev(1, 0, "security.alert", user_name="j.alvarez@example.test", outcome="medium", message="Entra ID Protection: Unfamiliar sign-in properties")],
+        ),
+        Case("informational alert", "benign", [_ev(1, 0, "security.alert", host="fin-ws-014", outcome="informational", message="Microsoft Defender: Test alert")]),
+        Case("low severity alert", "benign", [_ev(1, 0, "security.alert", host="fin-ws-014", outcome="low", message="Microsoft Defender: Potentially unwanted application")]),
+    ],
     "SF-NET-001": [
         Case("connection on 4444", "malicious", [_ev(1, 0, "network.connection", host="fin-ws-014", src_ip="10.20.4.17", dst_ip="198.51.100.23", dst_port=4444, bytes_out=18000)]),
         Case(

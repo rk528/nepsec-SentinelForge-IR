@@ -66,6 +66,7 @@ Roles: `viewer` < `analyst` < `lead` < `admin`.
 | POST | `/scenarios/{id}/run` | analyst in demo org, else admin | Injects synthetic events |
 | GET | `/system` | viewer | Version, migration revision, integration status (no secrets) |
 | POST | `/ingest/events` | ingest key | See below |
+| POST | `/ingest/microsoft/{format}` | ingest key | Native Microsoft JSON: `entra-signin`, `entra-audit`, `defender-alert`, `windows-event`; see [connectors-microsoft.md](connectors-microsoft.md) |
 
 ## Ingestion
 

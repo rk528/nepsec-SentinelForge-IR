@@ -16,7 +16,7 @@ def test_full_incident_workflow(api_for, db) -> None:
     r = ingest(admin.client, key, brute_force_events())
     assert r.status_code == 200, r.text
     body = r.json()
-    assert body == {"received": 7, "inserted": 7, "duplicates": 0, "alerts_created": 1, "alerts_updated": 0}
+    assert body == {"received": 7, "inserted": 7, "duplicates": 0, "alerts_created": 1, "alerts_updated": 0, "skipped": 0}
 
     # 2. The alert is visible in the triage queue (idempotent re-ingest is tested separately).
     alerts = admin.get("/api/v1/alerts").json()

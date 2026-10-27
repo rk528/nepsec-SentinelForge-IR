@@ -159,7 +159,22 @@ class PrivilegedAccountCreated(Rule):
     attack_techniques = ["T1136.001", "T1136.002", "T1098"]
     lookback_minutes = 30
 
-    PRIVILEGED_GROUPS = {"administrators", "domain admins", "enterprise admins", "schema admins", "sudo", "wheel"}
+    PRIVILEGED_GROUPS = {
+        "administrators",
+        "domain admins",
+        "enterprise admins",
+        "schema admins",
+        "sudo",
+        "wheel",
+        # Entra ID directory roles
+        "global administrator",
+        "privileged role administrator",
+        "security administrator",
+        "user administrator",
+        "exchange administrator",
+        "application administrator",
+        "privileged authentication administrator",
+    }
     WINDOW = timedelta(minutes=30)
 
     def evaluate(self, events: list[EventView], ctx: DetectionContext) -> list[Match]:
@@ -348,6 +363,52 @@ class PhishingLinkFollowed(Rule):
         return matches
 
 
+class MicrosoftSecurityAlert(Rule):
+    id = "SF-EXT-001"
+    name = "Microsoft Defender / Entra ID Protection alert"
+    description = "A medium or high severity alert raised by Microsoft Defender XDR, Defender for Cloud or Entra ID Protection, forwarded through the Graph security API."
+    severity = "medium"
+    confidence = "medium"
+    rationale = (
+        "Microsoft's own detections see telemetry this platform does not, such as endpoint memory, mailbox and identity risk signals. "
+        "Promoting them into the same queue lets analysts correlate them with local detections and run the incident workflow on them."
+    )
+    required_telemetry = ["security.alert from the Microsoft Graph security API (format defender-alert), severity in outcome"]
+    false_positives = [
+        "Whatever Microsoft's detection itself gets wrong; this rule adds no judgement of its own.",
+        "Alerts already resolved in the Microsoft portal before they were forwarded.",
+    ]
+    # Each alert carries its own techniques (raw.mitreTechniques); the rule has none of its own.
+    attack_techniques: list[str] = []
+    external_attack_mapping = True
+
+    SEVERITIES = {"high": "high", "medium": "medium"}
+
+    def evaluate(self, events: list[EventView], ctx: DetectionContext) -> list[Match]:
+        matches: list[Match] = []
+        for e in of_type(events, "security.alert"):
+            severity = self.SEVERITIES.get(lower(e.outcome))
+            if severity is None:
+                continue
+            title = e.message or "Microsoft security alert"
+            matches.append(
+                Match(
+                    rule_id=self.id,
+                    # Re-forwarding the same alert (e.g. after a status change) updates one alert, not several.
+                    dedup_key=f"{self.id}:{_short_hash(f'{title}|{lower(e.host)}|{lower(e.user_name)}')}:{e.event_time.strftime('%Y%m%d')}",
+                    title=title[:300],
+                    description=f"Forwarded from Microsoft for {e.host or e.user_name or 'an unnamed entity'}. Open the Microsoft portal link in the event for full context.",
+                    event_ids=[e.id],
+                    first_seen=e.event_time,
+                    last_seen=e.event_time,
+                    entities={"host": e.host, "user": e.user_name, "src_ip": e.src_ip},
+                    evidence={"microsoft_severity": e.outcome, "portal_url": e.url},
+                    severity=severity,
+                )
+            )
+        return matches
+
+
 ALL_RULES: list[Rule] = [
     AuthSuccessAfterFailures(),
     SuspiciousProcessExecution(),
@@ -355,6 +416,7 @@ ALL_RULES: list[Rule] = [
     SecurityLoggingTampered(),
     SuspiciousOutboundConnection(),
     PhishingLinkFollowed(),
+    MicrosoftSecurityAlert(),
 ]
 
 RULES_BY_ID: dict[str, Rule] = {r.id: r for r in ALL_RULES}

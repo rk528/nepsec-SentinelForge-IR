@@ -74,6 +74,7 @@ class EventView:
     email_sender: str | None = None
     email_subject: str | None = None
     bytes_out: int | None = None
+    message: str | None = None
 
 
 @dataclass
@@ -111,6 +112,8 @@ class Rule:
     version: ClassVar[int] = 1
     # How far before the evaluated window this rule needs to look for context.
     lookback_minutes: ClassVar[int] = 0
+    # True when techniques come from each forwarded alert rather than from the rule itself.
+    external_attack_mapping: ClassVar[bool] = False
 
     def evaluate(self, events: list[EventView], ctx: DetectionContext) -> list[Match]:
         raise NotImplementedError

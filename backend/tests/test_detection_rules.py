@@ -26,7 +26,8 @@ def test_rule_metadata_is_complete(rule) -> None:
     meta = rule.metadata()
     for key in ("id", "name", "description", "severity", "confidence", "rationale"):
         assert meta[key], key
-    assert meta["required_telemetry"] and meta["false_positives"] and meta["attack_techniques"]
+    assert meta["required_telemetry"] and meta["false_positives"]
+    assert meta["attack_techniques"] or rule.external_attack_mapping
     assert meta["severity"] in ("low", "medium", "high", "critical")
 
 

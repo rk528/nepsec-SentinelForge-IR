@@ -4,21 +4,22 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import Session
 
 from app import audit, ratelimit
 from app.audit import RequestContext
 from app.config import get_settings
+from app.connectors.microsoft import map_records
 from app.db import get_db
 from app.deps import Admin, Analyst, Lead, Principal, Viewer, get_ctx, request_context, require_non_demo
 from app.detection.engine import run_detection
 from app.intel.providers import PROVIDERS
 from app.models import AuditLog, DataSource, Organization, User
-from app.schemas import AuditOut, DataSourceCreateIn, IngestIn, IngestOut, Page, UserCreateIn, UserRef, UserUpdateIn
+from app.schemas import AuditOut, DataSourceCreateIn, EventIn, IngestIn, IngestOut, Page, UserCreateIn, UserRef, UserUpdateIn
 from app.security import hash_password, new_token, sha256_hex, validate_password_strength
 from app.services import demo
 from app.services.ingest import ingest_events
@@ -201,6 +202,37 @@ def ingest(body: IngestIn, request: Request, db: Session = Depends(get_db)) -> I
 
     This endpoint is separate from the analyst API: it does not accept session cookies.
     """
+    src = _ingest_source(request, db)
+    return _ingest(request, db, src, body.events, run=body.run_detection)
+
+
+MAX_VENDOR_RECORDS = 500
+
+
+@router.post("/ingest/microsoft/{fmt}", response_model=IngestOut, tags=["ingestion"])
+def ingest_microsoft(
+    fmt: Literal["entra-signin", "entra-audit", "defender-alert", "windows-event"],
+    request: Request,
+    payload: Any = Body(...),
+    db: Session = Depends(get_db),
+    run_detection: bool = True,
+) -> IngestOut:
+    """Microsoft logs in their native JSON shape, mapped to normalised events.
+
+    Accepts a Graph response (``{"value": [...]}``), an Azure Monitor export
+    (``{"records": [...]}``), a JSON array, or a single record. Same ingest key as
+    ``/ingest/events``. Records that do not map to a supported event are counted as skipped.
+    """
+    src = _ingest_source(request, db)
+    events, skipped = map_records(fmt, payload)
+    if len(events) + skipped > MAX_VENDOR_RECORDS:
+        raise HTTPException(status_code=413, detail=f"At most {MAX_VENDOR_RECORDS} records per request")
+    out = _ingest(request, db, src, events, run=run_detection, details={"format": fmt, "skipped": skipped})
+    out.skipped = skipped
+    return out
+
+
+def _ingest_source(request: Request, db: Session) -> DataSource:
     auth = request.headers.get("authorization", "")
     if not auth.lower().startswith("bearer ") or not auth[7:].startswith("sfk_") or len(auth) > 200:
         raise HTTPException(status_code=401, detail="Missing or invalid ingest key", headers={"WWW-Authenticate": "Bearer"})
@@ -209,14 +241,17 @@ def ingest(body: IngestIn, request: Request, db: Session = Depends(get_db)) -> I
         raise HTTPException(status_code=401, detail="Missing or invalid ingest key", headers={"WWW-Authenticate": "Bearer"})
     s = get_settings()
     ratelimit.hit(db, f"ingest:{src.id}", s.ingest_rate_limit, s.ingest_rate_window_seconds)
+    return src
 
-    result = ingest_events(db, src.org_id, src, body.events)
+
+def _ingest(request: Request, db: Session, src: DataSource, events: list[EventIn], *, run: bool, details: dict[str, Any] | None = None) -> IngestOut:
+    result = ingest_events(db, src.org_id, src, events)
     ctx = RequestContext(org_id=src.org_id, user_id=None, actor_label=f"ingest:{src.name}", ip=request_context(request).ip, request_id=getattr(request.state, "request_id", None))
     created = updated = 0
-    if body.run_detection and result.inserted and result.earliest:
+    if run and result.inserted and result.earliest:
         summary = run_detection(db, src.org_id, since=result.earliest, ctx=ctx)
         created, updated = summary.alerts_created, summary.alerts_updated
-    audit.record(db, ctx, "ingest.batch", target_type="data_source", target_id=src.id, details={"received": result.received, "inserted": result.inserted})
+    audit.record(db, ctx, "ingest.batch", target_type="data_source", target_id=src.id, details={"received": result.received, "inserted": result.inserted, **(details or {})})
     db.commit()
     return IngestOut(received=result.received, inserted=result.inserted, duplicates=result.received - result.inserted, alerts_created=created, alerts_updated=updated)
 

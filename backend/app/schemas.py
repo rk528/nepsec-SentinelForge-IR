@@ -45,6 +45,7 @@ EventType = Literal[
     "proxy.request",
     "email.delivered",
     "file.created",
+    "security.alert",
 ]
 
 
@@ -176,6 +177,7 @@ class IngestOut(BaseModel):
     duplicates: int
     alerts_created: int
     alerts_updated: int
+    skipped: int = 0
 
 
 class EventOut(ORM):
@@ -472,5 +474,5 @@ class UserUpdateIn(BaseModel):
 
 class DataSourceCreateIn(BaseModel):
     name: str = Field(min_length=2, max_length=120)
-    source_type: Literal["windows_security", "sysmon", "linux_auditd", "firewall", "dns", "proxy", "email_gateway", "edr", "custom"]
+    source_type: Literal["windows_security", "sysmon", "linux_auditd", "firewall", "dns", "proxy", "email_gateway", "edr", "microsoft_entra", "microsoft_defender", "custom"]
     description: str | None = Field(default=None, max_length=2000)

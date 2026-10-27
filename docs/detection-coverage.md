@@ -18,6 +18,7 @@ with no rule (gaps).
 | SF-DEF-001 | Security logging cleared or stopped | High (critical when cleared) / high | `log.cleared`, `service.stopped` | T1070.001, T1562.001, T1562.002 |
 | SF-NET-001 | Suspicious outbound connection (non-standard port, ≥50 MiB upload, or watchlisted destination) | Medium (high on watchlist or multiple reasons) / low | `network.connection` with dst IP/port and bytes | T1571, T1041, T1071 |
 | SF-MAIL-001 | Emailed link visited by the recipient within 60 min | High / medium | `email.delivered` with URL/domain, `dns.query` or `proxy.request` with user | T1566.002, T1204.001 |
+| SF-EXT-001 | Medium/high alert forwarded from Microsoft Defender XDR or Entra ID Protection | From the alert (high / medium) | `security.alert` (Graph `alerts_v2`) | Taken from each alert (`mitreTechniques`); none claimed by the rule |
 
 Severity (impact if real) and confidence (likelihood the detection is right) are stored
 separately on every alert.
@@ -42,6 +43,7 @@ against its fixtures and stores the results. Results from 27 October 2026:
 | SF-DEF-001 | 2 | 0 | 1 | 0 | 1.00 | 1.00 | Pass |
 | SF-NET-001 | 3 | 0 | 2 | 1 | 1.00 | 0.75 | Pass (FN documented) |
 | SF-MAIL-001 | 1 | 1 | 3 | 0 | 0.50 | 1.00 | Pass (FP documented) |
+| SF-EXT-001 | 2 | 0 | 2 | 0 | 1.00 | 1.00 | Pass |
 
 A rule "passes" when every case is classified correctly except cases explicitly marked as known
 limitations. These fixtures are small and hand-written: the numbers show that rules behave as

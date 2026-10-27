@@ -90,7 +90,7 @@ function DataSources() {
           <Field label="Name" htmlFor="ds-name"><Input id="ds-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} /></Field>
           <Field label="Type" htmlFor="ds-type">
             <Select id="ds-type" value={type} onChange={(e) => setType(e.target.value)}>
-              {["windows_security", "sysmon", "linux_auditd", "firewall", "dns", "proxy", "email_gateway", "edr", "custom"].map((t) => <option key={t} value={t}>{t}</option>)}
+              {["windows_security", "sysmon", "microsoft_entra", "microsoft_defender", "linux_auditd", "firewall", "dns", "proxy", "email_gateway", "edr", "custom"].map((t) => <option key={t} value={t}>{t}</option>)}
             </Select>
           </Field>
         </div>

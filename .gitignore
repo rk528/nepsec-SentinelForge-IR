@@ -37,3 +37,4 @@ Thumbs.db
 
 # Locally generated credentials (never commit)
 *.local.txt
+.graph_shipper_state.json
