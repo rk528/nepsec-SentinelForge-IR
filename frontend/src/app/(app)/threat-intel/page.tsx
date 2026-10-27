@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowUpRight, Database, Globe, RefreshCw, Search, UserCheck } from "lucide-react";
 import Link from "next/link";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 
 import { IntelVerdictBadge, StatusDot } from "@/components/ui/badges";
 import { DataTable, Pagination, type Column } from "@/components/ui/data-table";
@@ -252,14 +252,24 @@ function ThreatIntel() {
     onError: (e) => toast({ kind: "error", title: "Lookup failed", description: e instanceof ApiError ? e.detail : undefined }),
   });
 
-  async function normalise(v: string) {
+  // Debounced so typing does not send a request per keystroke; stale responses are dropped.
+  const normaliseTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const normaliseSeq = useRef(0);
+  useEffect(() => () => clearTimeout(normaliseTimer.current), []);
+
+  function normalise(v: string) {
     setValue(v);
+    clearTimeout(normaliseTimer.current);
+    const seq = ++normaliseSeq.current;
     if (!v.trim()) return setPreview(null);
-    try {
-      setPreview(await api<{ type: string; value: string }>("/iocs/normalise", { method: "POST", body: { value: v } }));
-    } catch {
-      setPreview(null);
-    }
+    normaliseTimer.current = setTimeout(async () => {
+      try {
+        const result = await api<{ type: string; value: string }>("/iocs/normalise", { method: "POST", body: { value: v } });
+        if (seq === normaliseSeq.current) setPreview(result);
+      } catch {
+        if (seq === normaliseSeq.current) setPreview(null);
+      }
+    }, 300);
   }
 
   const columns: Column<Indicator>[] = [

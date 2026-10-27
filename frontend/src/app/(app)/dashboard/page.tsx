@@ -154,7 +154,9 @@ function Dashboard() {
                   {s.priority_incidents.map((i) => (
                     <li key={i.id}>
                       <Link href={`/incidents/${i.id}`} className="flex items-center gap-3 px-4 py-2.5 hover:bg-raised/60">
-                        <SeverityBadge severity={i.severity} />
+                        <span className="w-[4.5rem] shrink-0">
+                          <SeverityBadge severity={i.severity} />
+                        </span>
                         <span className="mono w-20 shrink-0 text-xs text-muted">{i.reference}</span>
                         <span className="min-w-0 flex-1 truncate text-[13px] text-fg">{i.title}</span>
                         <span className="hidden sm:block">
