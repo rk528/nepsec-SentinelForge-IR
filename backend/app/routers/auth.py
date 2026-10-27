@@ -12,8 +12,8 @@ from app.config import get_settings
 from app.db import get_db
 from app.deps import Principal, client_ip, get_principal, request_context
 from app.models import Organization, User, UserSession
-from app.schemas import DemoLoginIn, LoginIn, MeOut
-from app.security import new_token, sha256_hex, verify_password
+from app.schemas import DemoLoginIn, LoginIn, MeOut, PasswordChangeIn
+from app.security import hash_password, new_token, sha256_hex, validate_password_strength, verify_password
 from app.services.demo import DEMO_SLUG, demo_org, seed_demo
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -143,6 +143,35 @@ def logout_all(request: Request, principal: Principal = Depends(get_principal), 
     response.delete_cookie(settings.session_cookie_name, path="/")
     response.delete_cookie(settings.csrf_cookie_name, path="/")
     return response
+
+
+@router.post("/password", status_code=204)
+def change_password(body: PasswordChangeIn, request: Request, principal: Principal = Depends(get_principal), db: Session = Depends(get_db)) -> Response:
+    """Change the signed-in user's password. Every other session of the user is revoked."""
+    settings = get_settings()
+    ratelimit.hit(db, f"password:user:{principal.user_id}", settings.login_rate_limit, settings.login_rate_window_seconds)
+    user = db.get(User, principal.user_id)
+    assert user is not None
+    if user.is_demo or user.password_hash is None:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Demo accounts have no password")
+    ctx = request_context(request, principal)
+    if not verify_password(body.current_password, user.password_hash):
+        audit.record(db, ctx, "auth.password_change_failed", target_type="user", target_id=user.id)
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
+    if body.new_password == body.current_password:
+        raise HTTPException(status_code=422, detail="The new password must differ from the current one")
+    try:
+        validate_password_strength(body.new_password)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    user.password_hash = hash_password(body.new_password)
+    db.execute(
+        update(UserSession).where(UserSession.user_id == user.id, UserSession.id != principal.session_id, UserSession.revoked_at.is_(None)).values(revoked_at=datetime.now(UTC))
+    )
+    audit.record(db, ctx, "auth.password_changed", target_type="user", target_id=user.id)
+    db.commit()
+    return Response(status_code=204)
 
 
 @router.get("/me", response_model=MeOut)

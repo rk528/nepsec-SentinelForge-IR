@@ -51,7 +51,7 @@ def test_unconfigured_providers_report_unconfigured(api_for) -> None:
     r = api.post("/api/v1/iocs/lookup", json={"value": "203.0.113.9"})
     assert r.status_code == 200, r.text
     statuses = {e["provider"]: e["status"] for e in r.json()["enrichments"]}
-    assert statuses == {"virustotal": "unconfigured", "abuseipdb": "unconfigured", "otx": "unconfigured"}
+    assert statuses == {"virustotal": "unconfigured", "abuseipdb": "unconfigured", "otx": "unconfigured", "nepsecintel": "unconfigured"}
     assert all(e["reported_verdict"] == "unknown" for e in r.json()["enrichments"])
 
 
@@ -101,6 +101,41 @@ def test_provider_timeout_is_an_error(monkeypatch: pytest.MonkeyPatch) -> None:
 
     _mock(monkeypatch, boom)
     result = providers.AlienVaultOTX().lookup("domain", "invoice-portal.example")
+    assert result.status == "error" and result.reported_verdict == "unknown"
+
+
+def _nepsec_body(level: str, score: int | None) -> dict:
+    return {
+        "indicator": {"type": "ipv4", "value": "198.51.100.77"},
+        "assessment": {"score": score, "level": level, "title": "High risk", "factors": [{"points": 40, "source": "AbuseIPDB", "label": "Abuse score 90"}]},
+        "results": [{"provider": "abuseipdb", "status": "ok"}, {"provider": "virustotal", "status": "ok"}, {"provider": "shodan", "status": "unconfigured"}],
+    }
+
+
+def test_nepsecintel_mapping_and_auth(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("NEPSECINTEL_API_KEY", "tl_test-key-not-real")
+    get_settings.cache_clear()
+    calls = _mock(monkeypatch, lambda req: httpx.Response(200, json=_nepsec_body("malicious", 82)))
+    result = providers.NepSecIntel().lookup("ipv4", "198.51.100.77")
+    assert result.status == "ok" and result.reported_verdict == "malicious" and result.score == 82.0
+    assert result.confidence == "medium" and result.summary["sources_answered"] == "2 of 3"
+    assert result.summary["report_url"] == "https://nepsecintel.kuinkel.com/?q=198.51.100.77"
+    assert calls[0].method == "POST" and calls[0].url.path == "/api/v1/lookup"
+    assert calls[0].headers["authorization"] == "Bearer tl_test-key-not-real"
+
+
+def test_nepsecintel_clean_is_unknown_not_safe(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("NEPSECINTEL_API_KEY", "tl_test-key-not-real")
+    get_settings.cache_clear()
+    _mock(monkeypatch, lambda req: httpx.Response(200, json=_nepsec_body("clean", 0)))
+    assert providers.NepSecIntel().lookup("ipv4", "198.51.100.77").reported_verdict == "unknown"
+
+
+def test_nepsecintel_without_pro_plan_is_an_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("NEPSECINTEL_API_KEY", "tl_test-key-not-real")
+    get_settings.cache_clear()
+    _mock(monkeypatch, lambda req: httpx.Response(403, json={"detail": "The workspace is part of the Pro plan."}))
+    result = providers.NepSecIntel().lookup("domain", "invoice-portal.example")
     assert result.status == "error" and result.reported_verdict == "unknown"
 
 

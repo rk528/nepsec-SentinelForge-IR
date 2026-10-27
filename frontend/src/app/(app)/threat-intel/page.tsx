@@ -41,7 +41,10 @@ const STATUS_TEXT: Record<string, string> = {
 
 function ProviderCard({ e, providers }: { e: Enrichment; providers: Provider[] }) {
   const p = providers.find((x) => x.name === e.provider);
-  const summary = Object.entries(e.summary ?? {}).filter(([, v]) => v !== null && v !== undefined && !(Array.isArray(v) && v.length === 0));
+  const { report_url: reportUrl, ...rest } = e.summary ?? {};
+  const summary = Object.entries(rest).filter(([, v]) => v !== null && v !== undefined && !(Array.isArray(v) && v.length === 0));
+  // Only https links are rendered, so a provider cannot inject a javascript: URL.
+  const reportHref = typeof reportUrl === "string" && reportUrl.startsWith("https://") ? reportUrl : null;
   return (
     <div className="rounded-lg border border-line bg-raised/30 p-3.5">
       <div className="flex items-start justify-between gap-2">
@@ -68,6 +71,11 @@ function ProviderCard({ e, providers }: { e: Enrichment; providers: Provider[] }
             </div>
           ))}
         </dl>
+      )}
+      {reportHref && (
+        <a href={reportHref} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1 text-xs text-accent hover:underline">
+          Open full report <ArrowUpRight className="size-3" aria-hidden />
+        </a>
       )}
       {(e.fetched_at || p) && (
         <p className="mt-3 flex flex-wrap items-center gap-x-2 text-[11px] text-subtle">

@@ -55,6 +55,10 @@ class Settings(BaseSettings):
     virustotal_api_key: SecretStr | None = None
     abuseipdb_api_key: SecretStr | None = None
     otx_api_key: SecretStr | None = None
+    # NepSec Intel (https://nepsecintel.kuinkel.com): aggregates many sources behind one API key.
+    nepsecintel_api_key: SecretStr | None = None
+    nepsecintel_base_url: str = "https://nepsecintel.kuinkel.com"
+    nepsecintel_timeout_seconds: float = 25.0
     intel_cache_hours: int = 24
     intel_http_timeout_seconds: float = 8.0
 

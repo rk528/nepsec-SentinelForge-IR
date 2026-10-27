@@ -39,6 +39,7 @@ variable settings and a local, git-ignored `backend/.env`.
 | `DEMO_MODE` | `true` for the public demo | Plain |
 | `COOKIE_SECURE` | `true` | Plain |
 | `VIRUSTOTAL_API_KEY`, `ABUSEIPDB_API_KEY`, `OTX_API_KEY` | optional | Sensitive |
+| `NEPSECINTEL_API_KEY` | optional: an API key from NepSec Intel's Workspace page (needs a Pro or admin account there) | Sensitive |
 
 4. Deploy, then check `https://<backend-domain>/api/v1/health` returns
    `{"status":"ok","database":"ok",...}`.

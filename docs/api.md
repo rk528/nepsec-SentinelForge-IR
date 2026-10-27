@@ -30,6 +30,7 @@ Roles: `viewer` < `analyst` < `lead` < `admin`.
 | POST | `/auth/login` | public | Rate limited per IP and per account |
 | POST | `/auth/demo` | public, demo mode only | `{role: analyst\|lead\|viewer}`; seeds the demo on first use |
 | POST | `/auth/logout`, `/auth/logout-all` | any | Revokes this / all sessions |
+| POST | `/auth/password` | any non-demo user | Change own password (`current_password`, `new_password`); revokes the user's other sessions |
 | GET | `/auth/me` | any | Current user |
 | GET | `/dashboard/summary?days=` | viewer | KPIs, trends, telemetry health |
 | GET/POST | `/incidents` | viewer / analyst | Filters: `q,status[],severity[],assignee_id,unassigned,tag,sort,order` |

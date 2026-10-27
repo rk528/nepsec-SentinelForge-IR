@@ -76,6 +76,11 @@ class LoginIn(BaseModel):
     password: str = Field(min_length=1, max_length=256)
 
 
+class PasswordChangeIn(BaseModel):
+    current_password: str = Field(min_length=1, max_length=256)
+    new_password: str = Field(min_length=1, max_length=256)
+
+
 class DemoLoginIn(BaseModel):
     role: Literal["analyst", "lead", "viewer"] = "analyst"
 

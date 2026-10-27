@@ -36,7 +36,7 @@ export const NAV: { section: string; items: NavItem[] }[] = [
     section: "Investigate",
     items: [
       { href: "/investigations", label: "My investigations", icon: ListChecks, keywords: "assigned work" },
-      { href: "/threat-intel", label: "Threat intel", icon: Search, keywords: "ioc indicator lookup virustotal abuseipdb otx" },
+      { href: "/threat-intel", label: "Threat intel", icon: Search, keywords: "ioc indicator lookup virustotal abuseipdb otx nepsec" },
     ],
   },
   {

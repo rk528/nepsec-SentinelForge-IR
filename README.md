@@ -18,7 +18,7 @@ action is simulated.**
 | Detection | Six documented rules (brute force, LOLBins, privileged account creation, log tampering, suspicious egress, phishing click) with labelled fixtures and an honest self-test (TP/FP/TN/FN, precision, recall, known misses) |
 | Alert triage | Dedup-safe alerts with rule rationale, false-positive notes and matching events; acknowledge, close with disposition, or escalate |
 | Incidents | Lifecycle state machine (New → Open → Investigating → Contained → Resolved → Closed, lead-only reopen), optimistic concurrency, merged timeline, append-only notes, hashed evidence with provenance |
-| Threat intel | IOC normalisation (incl. defanged input), VirusTotal / AbuseIPDB / OTX adapters with caching and rate-limit handling, local sightings, analyst verdict kept separate from provider findings |
+| Threat intel | IOC normalisation (incl. defanged input), VirusTotal / AbuseIPDB / OTX / [NepSec Intel](https://nepsecintel.kuinkel.com) adapters with caching and rate-limit handling, local sightings, analyst verdict kept separate from provider findings |
 | Response | Seven playbooks; firewall block is simulated and needs approval from a *different* lead; internal addresses refused; idempotency keys |
 | ATT&CK | Coverage view with tested/untested/gap states, observed alerts and last test time, plus an explicit disclaimer |
 | Reporting | JSON, Markdown and print-to-PDF reports that quote analyst text verbatim and list limitations |
@@ -76,7 +76,7 @@ extensions are skipped automatically on Windows for the same reason.
 ## Tests
 
 ```bash
-cd backend  && python -m pytest                    # 88 tests against real PostgreSQL
+cd backend  && python -m pytest                    # 93 tests against real PostgreSQL
 cd frontend && npm run lint && npm run typecheck && npm test   # 23 unit/component tests
 cd frontend && npm run test:e2e                    # 10 Playwright tests incl. axe WCAG scans
 ```

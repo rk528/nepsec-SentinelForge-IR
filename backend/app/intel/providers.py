@@ -14,6 +14,7 @@ from __future__ import annotations
 import base64
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -213,4 +214,56 @@ class AlienVaultOTX(Provider):
         )
 
 
-PROVIDERS: list[Provider] = [VirusTotal(), AbuseIPDB(), AlienVaultOTX()]
+class NepSecIntel(Provider):
+    """NepSec Intel's /api/v1/lookup, which asks its own set of sources and scores the result.
+
+    Its "clean" level means no reputation source reported the indicator, so it maps to
+    ``unknown`` like every other absence of evidence here.
+    """
+
+    name = "nepsecintel"
+    label = "NepSec Intel"
+    supported = ("ipv4", "ipv6", "domain", "url", "md5", "sha1", "sha256")
+    terms_url = "https://nepsecintel.kuinkel.com/privacy"
+
+    _LEVELS = {"malicious": "malicious", "suspicious": "suspicious"}
+
+    def api_key(self) -> str | None:
+        k = get_settings().nepsecintel_api_key
+        return k.get_secret_value() if k else None
+
+    @staticmethod
+    def base_url() -> str:
+        return get_settings().nepsecintel_base_url.rstrip("/")
+
+    def _lookup(self, client: httpx.Client, ioc_type: str, value: str) -> ProviderResult:
+        resp = client.post(
+            self.base_url() + "/api/v1/lookup",
+            json={"query": value, "brief": True},
+            headers={"Authorization": f"Bearer {self.api_key() or ''}", "Accept": "application/json"},
+            timeout=get_settings().nepsecintel_timeout_seconds,
+        )
+        if err := self._common_errors(resp):
+            return err
+        body = resp.json()
+        assessment = body.get("assessment") or {}
+        results = body.get("results") or []
+        answered = [r for r in results if r.get("status") == "ok"]
+        level = str(assessment.get("level") or "unknown")
+        score = assessment.get("score")
+        return ProviderResult(
+            status="ok",
+            reported_verdict=self._LEVELS.get(level, "unknown"),
+            score=float(score) if isinstance(score, int | float) else None,
+            confidence="high" if len(answered) >= 4 else "medium" if len(answered) >= 2 else "low",
+            summary={
+                "assessment": str(assessment.get("title") or "")[:80] or None,
+                "risk_score": score,
+                "sources_answered": f"{len(answered)} of {len(results)}",
+                "top_factors": [f"{f.get('source')}: {str(f.get('label'))[:100]}" for f in (assessment.get("factors") or [])[:4]],
+                "report_url": f"{self.base_url()}/?q={quote(value, safe='')}",
+            },
+        )
+
+
+PROVIDERS: list[Provider] = [VirusTotal(), AbuseIPDB(), AlienVaultOTX(), NepSecIntel()]

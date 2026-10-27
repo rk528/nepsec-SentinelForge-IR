@@ -188,8 +188,39 @@ function Scenarios({ orgIsDemo }: { orgIsDemo: boolean }) {
   );
 }
 
+function ChangePassword() {
+  const toast = useToast();
+  const empty = { current_password: "", new_password: "", confirm: "" };
+  const [form, setForm] = useState(empty);
+  const mismatch = form.confirm.length > 0 && form.confirm !== form.new_password;
+  const change = useMutation({
+    mutationFn: () => api("/auth/password", { method: "POST", body: { current_password: form.current_password, new_password: form.new_password } }),
+    onSuccess: () => { setForm(empty); toast({ kind: "success", title: "Password changed", description: "Your other sessions were signed out." }); },
+    onError: (e) => toast({ kind: "error", title: "Password not changed", description: errText(e) }),
+  });
+  return (
+    <Panel title={<span className="flex items-center gap-1.5"><KeyRound className="size-3.5 text-accent" aria-hidden /> Change password</span>} description="12+ characters with upper and lower case letters and a digit. Every other session of yours is signed out." id="password">
+      <form
+        className="grid gap-3 md:grid-cols-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!mismatch && form.new_password) change.mutate();
+        }}
+      >
+        <Field label="Current password" htmlFor="pw-current"><Input id="pw-current" type="password" autoComplete="current-password" value={form.current_password} onChange={(e) => setForm({ ...form, current_password: e.target.value })} /></Field>
+        <Field label="New password" htmlFor="pw-new"><Input id="pw-new" type="password" autoComplete="new-password" value={form.new_password} onChange={(e) => setForm({ ...form, new_password: e.target.value })} /></Field>
+        <Field label="Repeat new password" htmlFor="pw-confirm" error={mismatch ? "Passwords do not match" : undefined}><Input id="pw-confirm" type="password" autoComplete="new-password" aria-invalid={mismatch} value={form.confirm} onChange={(e) => setForm({ ...form, confirm: e.target.value })} /></Field>
+        <div className="md:col-span-3">
+          <Button type="submit" variant="primary" loading={change.isPending} disabled={!form.current_password || !form.new_password || mismatch}>Change password</Button>
+        </div>
+      </form>
+    </Panel>
+  );
+}
+
 export default function SettingsPage() {
   const isAdmin = useCan("admin");
+  const { data: me } = useMe();
   const sys = useQuery({ queryKey: ["system"], queryFn: () => api<SystemInfo>("/system") });
   return (
     <>
@@ -229,6 +260,7 @@ export default function SettingsPage() {
         <DataSources />
         {sys.data && <Scenarios orgIsDemo={sys.data.organization.is_demo} />}
         {isAdmin && <Users />}
+        {me && !me.is_demo && <ChangePassword />}
       </div>
     </>
   );

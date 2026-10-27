@@ -41,7 +41,7 @@ os.environ.update(
         "TRUST_PROXY_HEADERS": "true",
     }
 )
-for key in ("VIRUSTOTAL_API_KEY", "ABUSEIPDB_API_KEY", "OTX_API_KEY", "DATABASE_URL_UNPOOLED"):
+for key in ("VIRUSTOTAL_API_KEY", "ABUSEIPDB_API_KEY", "OTX_API_KEY", "NEPSECINTEL_API_KEY", "DATABASE_URL_UNPOOLED"):
     os.environ.pop(key, None)
 
 from alembic.config import Config  # noqa: E402

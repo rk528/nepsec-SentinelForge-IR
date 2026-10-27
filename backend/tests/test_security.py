@@ -12,7 +12,7 @@ from sqlalchemy.exc import DBAPIError
 
 from app.config import get_settings
 from app.models import AuditLog, UserSession
-from tests.helpers import PASSWORD, brute_force_events, create_source, ingest
+from tests.helpers import PASSWORD, Api, brute_force_events, create_source, ingest
 
 # --- authentication ---------------------------------------------------------------
 
@@ -70,6 +70,28 @@ def test_logout_revokes_session(api_for) -> None:
     assert api.post("/api/v1/auth/logout").status_code == 204
     api.client.cookies.set("sf_session", token)
     assert api.get("/api/v1/auth/me").status_code == 401
+
+
+def test_password_change_revokes_other_sessions(app, make_user) -> None:
+    user = make_user("admin")
+    first = Api(TestClient(app)).login(user.email)
+    second = Api(TestClient(app)).login(user.email)
+    new = "Fresh-Admin-Pass-2026"
+
+    assert second.post("/api/v1/auth/password", json={"current_password": "wrong-Password-1", "new_password": new}).status_code == 400
+    assert second.post("/api/v1/auth/password", json={"current_password": PASSWORD, "new_password": "short"}).status_code == 422
+    assert second.post("/api/v1/auth/password", json={"current_password": PASSWORD, "new_password": new}).status_code == 204
+
+    assert second.get("/api/v1/auth/me").status_code == 200  # the session that changed it stays signed in
+    assert first.get("/api/v1/auth/me").status_code == 401
+    assert Api(TestClient(app)).client.post("/api/v1/auth/login", json={"email": user.email, "password": PASSWORD}).status_code == 401
+    Api(TestClient(app)).login(user.email, new)
+
+
+def test_password_change_needs_csrf(api_for) -> None:
+    api = api_for("analyst")
+    r = api.client.post("/api/v1/auth/password", json={"current_password": PASSWORD, "new_password": "Fresh-Admin-Pass-2026"})
+    assert r.status_code == 403
 
 
 def test_idle_session_expires(api_for, db) -> None:

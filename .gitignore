@@ -34,3 +34,6 @@ test-results/
 Thumbs.db
 .idea/
 *.log
+
+# Locally generated credentials (never commit)
+*.local.txt
