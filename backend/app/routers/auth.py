@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import func, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app import audit, ratelimit
@@ -13,7 +14,7 @@ from app.deps import Principal, client_ip, get_principal, request_context
 from app.models import Organization, User, UserSession
 from app.schemas import DemoLoginIn, LoginIn, MeOut
 from app.security import new_token, sha256_hex, verify_password
-from app.services.demo import DEMO_SLUG
+from app.services.demo import DEMO_SLUG, demo_org, seed_demo
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -89,15 +90,28 @@ def demo_login(body: DemoLoginIn, request: Request, response: Response, db: Sess
     if not settings.demo_mode:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     ratelimit.hit(db, f"demo:ip:{client_ip(request) or 'unknown'}", 30, 300)
-    user = db.execute(
-        select(User)
-        .join(Organization, Organization.id == User.org_id)
-        .where(Organization.slug == DEMO_SLUG, Organization.is_demo.is_(True), User.is_demo.is_(True), User.role == body.role, User.is_active.is_(True))
-        .order_by(User.email)
-        .limit(1)
-    ).scalar_one_or_none()
+
+    def find_user() -> User | None:
+        return db.execute(
+            select(User)
+            .join(Organization, Organization.id == User.org_id)
+            .where(Organization.slug == DEMO_SLUG, Organization.is_demo.is_(True), User.is_demo.is_(True), User.role == body.role, User.is_active.is_(True))
+            .order_by(User.email)
+            .limit(1)
+        ).scalar_one_or_none()
+
+    user = find_user()
+    if user is None and demo_org(db) is None:
+        # First demo sign-in on a fresh database: create the synthetic workspace.
+        # This only ever creates the demo organisation and never touches other data.
+        try:
+            seed_demo(db)
+            db.commit()
+        except (IntegrityError, RuntimeError):
+            db.rollback()  # another request seeded it concurrently
+        user = find_user()
     if user is None:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Demo workspace is not seeded")
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Demo workspace is not available")
     csrf = _start_session(db, request, response, user)
     ctx = request_context(request)
     ctx.org_id, ctx.user_id, ctx.actor_label = user.org_id, user.id, user.email

@@ -159,3 +159,14 @@ def test_attack_coverage_reports_gaps_and_tests(api_for) -> None:
     assert all(r["passed"] for r in results)
     after = api.get("/api/v1/attack/coverage").json()
     assert next(t for t in after["techniques"] if t["technique"] == "T1110")["coverage"] == "tested"
+
+
+def test_first_demo_login_seeds_workspace(app, db) -> None:
+    assert demo.demo_org(db) is None
+    r = TestClient(app).post("/api/v1/auth/demo", json={"role": "analyst"})
+    assert r.status_code == 200 and r.json()["is_demo"] is True
+    db.expire_all()
+    assert demo.demo_org(db) is not None
+    # A second sign-in reuses the existing workspace rather than seeding again.
+    assert TestClient(app).post("/api/v1/auth/demo", json={"role": "viewer"}).status_code == 200
+    assert db.execute(select(func.count()).select_from(Organization).where(Organization.slug == "demo")).scalar_one() == 1
