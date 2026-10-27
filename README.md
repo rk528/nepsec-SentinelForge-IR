@@ -78,7 +78,7 @@ extensions are skipped automatically on Windows for the same reason.
 ## Tests
 
 ```bash
-cd backend  && python -m pytest                    # 114 tests against real PostgreSQL
+cd backend  && python -m pytest                    # 115 tests against real PostgreSQL
 cd frontend && npm run lint && npm run typecheck && npm test   # 23 unit/component tests
 cd frontend && npm run test:e2e                    # 10 Playwright tests incl. axe WCAG scans
 ```
@@ -113,6 +113,7 @@ A five-minute walkthrough and three case studies: [docs/portfolio-demo.md](docs/
 | [testing.md](docs/testing.md) | Test suites and recorded results |
 | [connectors-microsoft.md](docs/connectors-microsoft.md) | Sending Entra ID, Defender and Windows logs |
 | [connectors-fortigate.md](docs/connectors-fortigate.md) | FortiGate syslog relay and FortiOS configuration |
+| [Data Source Connection Manual (PDF)](docs/manual/SentinelForge-IR-Data-Source-Manual.pdf) | Full step-by-step guide for every log source, threat intel, verification and troubleshooting |
 | [deployment.md](docs/deployment.md) | Vercel + Neon setup, migrations, rollback |
 | [free-tier-limitations.md](docs/free-tier-limitations.md) | Verified limits and implications |
 | [portfolio-demo.md](docs/portfolio-demo.md) | Walkthrough and case studies |

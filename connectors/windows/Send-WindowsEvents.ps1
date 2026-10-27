@@ -68,6 +68,10 @@ foreach ($q in $queries) {
             if ($d.Name) { $data[$d.Name] = [string]$d.'#text' }
         }
         if ($e.Id -eq 4624 -and -not $IncludeNetworkLogons -and $data['LogonType'] -eq '3') { continue }
+        if ($e.Id -in 4728, 4732, 4756 -and ($data['MemberName'] -in $null, '', '-') -and $data['MemberSid']) {
+            # Local group changes record only the member's SID; resolve it so it matches the 4720 account name.
+            try { $data['MemberName'] = ([Security.Principal.SecurityIdentifier]$data['MemberSid']).Translate([Security.Principal.NTAccount]).Value } catch { }
+        }
         if ($e.Id -eq 7036) {
             # 7036 carries the service name and state as param1/param2 in the System log.
             $data['param1'] = [string]$e.Properties[0].Value

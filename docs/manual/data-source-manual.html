@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SentinelForge IR – Data Source Connection Manual</title>
+<style>
+  @page { size: A4; margin: 20mm 17mm 20mm 17mm; }
+  :root {
+    --ink: #18181b; --muted: #52525b; --line: #e4e4e7; --soft: #f4f4f5;
+    --accent: #6d28d9; --accent-soft: #f3efff; --warn: #9a3412; --warn-soft: #fff4ec; --ok: #166534; --ok-soft: #effaf2;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #fff; color: var(--ink); }
+  body { font-family: "Segoe UI", Inter, system-ui, -apple-system, Arial, sans-serif; font-size: 10.2pt; line-height: 1.5; }
+  h1, h2, h3, h4 { color: #09090b; line-height: 1.25; margin: 0; }
+  h2 { font-size: 17pt; margin: 0 0 4mm; padding-bottom: 2mm; border-bottom: 2px solid var(--accent); }
+  h3 { font-size: 12.5pt; margin: 6mm 0 2mm; break-after: avoid; page-break-after: avoid; }
+  h4 { font-size: 10.6pt; margin: 4mm 0 1.5mm; break-after: avoid; page-break-after: avoid; }
+  td:first-child code { white-space: nowrap; }
+  h3 + table, h4 + table, h3 + pre, h4 + pre, h3 + p, h4 + p { break-before: avoid; }
+  p { margin: 0 0 2.6mm; }
+  a { color: var(--accent); text-decoration: none; }
+  code, pre, .mono { font-family: "Cascadia Mono", Consolas, "JetBrains Mono", monospace; }
+  code { font-size: 8.8pt; background: var(--soft); border: 1px solid var(--line); border-radius: 3px; padding: 0 3px; word-break: break-word; }
+  pre { font-size: 8.4pt; line-height: 1.45; background: #fafafa; border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 4px; padding: 3mm 3.5mm; margin: 2mm 0 3.5mm; white-space: pre-wrap; word-break: break-word; page-break-inside: avoid; }
+  pre .c { color: #6b7280; }
+  table { width: 100%; border-collapse: collapse; margin: 2mm 0 4mm; font-size: 9.2pt; page-break-inside: auto; }
+  tr { page-break-inside: avoid; }
+  th, td { text-align: left; vertical-align: top; padding: 1.6mm 2.2mm; border-bottom: 1px solid var(--line); }
+  th { background: var(--soft); font-weight: 600; border-bottom: 1px solid #d4d4d8; }
+  ol, ul { margin: 0 0 3mm; padding-left: 6mm; }
+  li { margin: 0 0 1.2mm; }
+  .chapter { page-break-before: always; }
+  .lead { font-size: 11pt; color: var(--muted); }
+  .note, .warn, .ok { border-radius: 5px; padding: 2.6mm 3.5mm; margin: 2.5mm 0 3.5mm; page-break-inside: avoid; font-size: 9.6pt; }
+  .note { background: var(--accent-soft); border: 1px solid #ddd2ff; }
+  .warn { background: var(--warn-soft); border: 1px solid #fbd5bd; }
+  .ok { background: var(--ok-soft); border: 1px solid #c6ebd1; }
+  .note b:first-child, .warn b:first-child, .ok b:first-child { display: block; margin-bottom: 0.8mm; }
+  .step { display: grid; grid-template-columns: 8mm 1fr; gap: 3mm; margin: 0 0 3mm; page-break-inside: avoid; }
+  .step .n { width: 7mm; height: 7mm; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 700; font-size: 9.5pt; display: grid; place-items: center; }
+  .step .b > :last-child { margin-bottom: 0; }
+  .kv { display: grid; grid-template-columns: 38mm 1fr; gap: 1mm 4mm; margin: 2mm 0 4mm; font-size: 9.6pt; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; font-weight: 500; }
+  .tag { display: inline-block; font-size: 8pt; font-weight: 600; border-radius: 3px; padding: 0 4px; border: 1px solid; }
+  .tag.req { color: var(--accent); border-color: #cdbcff; background: var(--accent-soft); }
+  .tag.opt { color: var(--muted); border-color: var(--line); background: var(--soft); }
+
+  /* Cover */
+  .cover { height: 257mm; display: flex; flex-direction: column; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 4mm; }
+  .logo { width: 14mm; height: 14mm; border-radius: 3.5mm; background: var(--accent); display: grid; place-items: center; }
+  .cover h1 { font-size: 30pt; letter-spacing: -0.5px; margin: 0 0 4mm; }
+  .cover .sub { font-size: 14pt; color: var(--muted); max-width: 150mm; }
+  .cover .meta { border-top: 1px solid var(--line); padding-top: 5mm; font-size: 9.6pt; color: var(--muted); display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; }
+  .cover .meta b { display: block; color: var(--ink); }
+  .pills { display: flex; flex-wrap: wrap; gap: 2mm; margin-top: 8mm; }
+  .pills span { border: 1px solid var(--line); border-radius: 99px; padding: 1mm 3.5mm; font-size: 9.5pt; background: var(--soft); }
+
+  /* Table of contents */
+  .toc { list-style: none; padding: 0; margin: 4mm 0 0; }
+  .toc li { display: flex; gap: 3mm; padding: 2mm 0; border-bottom: 1px dotted #d4d4d8; margin: 0; }
+  .toc .num { width: 9mm; color: var(--accent); font-weight: 700; }
+  .toc .t { flex: 1; }
+  .toc .d { color: var(--muted); font-size: 9pt; }
+
+  /* Diagram */
+  .flow { display: grid; grid-template-columns: 1fr 9mm 1fr 9mm 1fr; align-items: center; margin: 3mm 0 5mm; page-break-inside: avoid; }
+  .box { border: 1px solid #d4d4d8; border-radius: 5px; padding: 2.5mm 3mm; background: #fff; font-size: 9pt; min-height: 22mm; }
+  .box b { display: block; font-size: 9.8pt; margin-bottom: 1mm; }
+  .box.hl { border-color: #bda7ff; background: var(--accent-soft); }
+  .arrow { text-align: center; color: var(--accent); font-size: 15pt; font-weight: 700; }
+  .stack { display: flex; flex-direction: column; gap: 2mm; }
+  .stack .box { min-height: 0; }
+
+  .shot { border: 1px solid var(--line); border-radius: 5px; overflow: hidden; margin: 2mm 0 1.5mm; page-break-inside: avoid; }
+  .crop { position: relative; width: 100%; overflow: hidden; }
+  .crop img { display: block; }
+  .caption { font-size: 8.6pt; color: var(--muted); margin: 0 0 4mm; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }
+  .check { list-style: none; padding-left: 0; }
+  .check li::before { content: "☐"; color: var(--accent); margin-right: 2.5mm; font-size: 10.5pt; }
+</style>
+</head>
+<body>
+
+<!-- ============================== COVER ============================== -->
+<section class="cover">
+  <div class="brand">
+    <div class="logo">
+      <svg viewBox="0 0 32 32" width="34" height="34" fill="none"><path d="M16 2.5 27.7 9.25v13.5L16 29.5 4.3 22.75V9.25L16 2.5Z" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/><path d="m10.5 13.5 5.5 5 5.5-5" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 18.5V24" stroke="#fff" stroke-width="2.4" stroke-linecap="round" opacity=".6"/></svg>
+    </div>
+    <div><b style="font-size:13pt">SentinelForge IR</b><br><span style="color:var(--muted)">Incident response &amp; security engineering</span></div>
+  </div>
+  <div>
+    <h1>Data Source Connection Manual</h1>
+    <p class="sub">Step-by-step instructions for sending logs from firewalls, Windows servers, Microsoft 365 / Entra ID, Microsoft Defender and custom systems into SentinelForge IR, and for enabling threat-intelligence lookups.</p>
+    <div class="pills"><span>FortiGate firewall</span><span>Windows Security &amp; Sysmon</span><span>Microsoft Entra ID</span><span>Microsoft Defender XDR</span><span>Azure Monitor / Sentinel</span><span>Custom JSON API</span><span>NepSec Intel</span></div>
+  </div>
+  <div class="meta">
+    <div><b>Application</b>https://sentinelforge.kuinkel.com</div>
+    <div><b>Ingestion API</b>https://sentinelforge-api.kuinkel.com</div>
+    <div><b>Version</b>Manual 1.0 · 27 October 2026</div>
+  </div>
+</section>
+
+<!-- ============================== CONTENTS ============================== -->
+<section class="chapter">
+  <h2>Contents</h2>
+  <ol class="toc">
+    <li><span class="num">1</span><span class="t">How log collection works<br><span class="d">Data sources, ingest keys, endpoints, and what the detections need</span></span></li>
+    <li><span class="num">2</span><span class="t">Before you start<br><span class="d">Accounts, network access, where to get the scripts, key handling</span></span></li>
+    <li><span class="num">3</span><span class="t">Create a data source and ingest key<br><span class="d">Also: rotate, revoke and delete keys</span></span></li>
+    <li><span class="num">4</span><span class="t">FortiGate firewall<br><span class="d">Syslog relay, FortiOS configuration, policy logging</span></span></li>
+    <li><span class="num">5</span><span class="t">Windows servers and workstations<br><span class="d">Audit policy, PowerShell shipper, scheduled task, Sysmon</span></span></li>
+    <li><span class="num">6</span><span class="t">Microsoft Entra ID and Microsoft Defender<br><span class="d">App registration, Graph permissions, Graph shipper</span></span></li>
+    <li><span class="num">7</span><span class="t">Azure Monitor, Log Analytics and Microsoft Sentinel<br><span class="d">Forwarding with a Logic App, no scripts on servers</span></span></li>
+    <li><span class="num">8</span><span class="t">Any other source: the JSON ingestion API<br><span class="d">Event format, examples in curl, PowerShell and Python</span></span></li>
+    <li><span class="num">9</span><span class="t">Threat-intelligence providers<br><span class="d">NepSec Intel, VirusTotal, AbuseIPDB, AlienVault OTX</span></span></li>
+    <li><span class="num">10</span><span class="t">Verify the connection<br><span class="d">Health, events, safe test alerts for each source</span></span></li>
+    <li><span class="num">11</span><span class="t">Troubleshooting<br><span class="d">Symptoms, HTTP errors and fixes</span></span></li>
+    <li><span class="num">12</span><span class="t">Security checklist and reference<br><span class="d">Limits, event types, field reference</span></span></li>
+  </ol>
+</section>
+
+<!-- ============================== 1 ============================== -->
+<section class="chapter">
+  <h2>1. How log collection works</h2>
+  <p class="lead">SentinelForge receives logs over HTTPS. Every log source posts batches of events to the ingestion API with its own secret key. The platform normalises the events, stores them, and immediately runs the detection rules over them.</p>
+
+  <div class="flow">
+    <div class="stack">
+      <div class="box"><b>FortiGate</b>syslog → relay</div>
+      <div class="box"><b>Windows servers</b>PowerShell shipper</div>
+      <div class="box"><b>Microsoft 365</b>Graph shipper / Logic App</div>
+      <div class="box"><b>Other systems</b>your script → JSON API</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="box hl"><b>Ingestion API</b>HTTPS POST<br><code>Authorization: Bearer sfk_…</code><br>One key per data source. Validates, normalises, de-duplicates.</div>
+    <div class="arrow">→</div>
+    <div class="box"><b>SentinelForge</b>Events stored → detection rules run → alerts in the queue → incidents, threat intel, response.</div>
+  </div>
+
+  <h3>Key terms</h3>
+  <table>
+    <tr><th style="width:32mm">Term</th><th>Meaning</th></tr>
+    <tr><td><b>Data source</b></td><td>A named log stream, for example “FortiGate HQ” or “DC01 Security log”. Each has a health status (Reporting / Stale), an event count and its own ingest key.</td></tr>
+    <tr><td><b>Ingest key</b></td><td>A secret starting with <code>sfk_</code>. It is shown <b>once</b> when created; only its hash is stored. It can only send events: it cannot read data or sign in.</td></tr>
+    <tr><td><b>Shipper / relay</b></td><td>A small program that collects logs where they are produced and posts them to the API. SentinelForge provides ready-made ones for FortiGate, Windows and Microsoft Graph (folder <code>connectors/</code> in the repository).</td></tr>
+    <tr><td><b>Endpoint</b></td><td>The API address a shipper posts to. Each format has its own endpoint (table below).</td></tr>
+  </table>
+
+  <h3>Ingestion endpoints</h3>
+  <table>
+    <tr><th>Endpoint (on https://sentinelforge-api.kuinkel.com)</th><th>Accepts</th><th>Used by</th></tr>
+    <tr><td><code>POST /api/v1/ingest/fortigate</code></td><td>FortiOS syslog lines (key=value or JSON)</td><td>FortiGate relay</td></tr>
+    <tr><td><code>POST /api/v1/ingest/microsoft/windows-event</code></td><td>Windows Security, System, Sysmon events</td><td>Windows shipper, Log Analytics</td></tr>
+    <tr><td><code>POST /api/v1/ingest/microsoft/entra-signin</code></td><td>Entra ID sign-in logs</td><td>Graph shipper, Logic App</td></tr>
+    <tr><td><code>POST /api/v1/ingest/microsoft/entra-audit</code></td><td>Entra ID audit logs</td><td>Graph shipper, Logic App</td></tr>
+    <tr><td><code>POST /api/v1/ingest/microsoft/defender-alert</code></td><td>Defender XDR / Entra ID Protection alerts</td><td>Graph shipper, Logic App</td></tr>
+    <tr><td><code>POST /api/v1/ingest/events</code></td><td>Normalised JSON events (any system)</td><td>Your own scripts and tools</td></tr>
+  </table>
+
+  <h3>What the detections look for</h3>
+  <table>
+    <tr><th style="width:24mm">Rule</th><th>Detects</th><th>Needs logs from</th></tr>
+    <tr><td><b>SF-AUTH-001</b></td><td>Five or more failed logins for one account from one address, then a success within 10 minutes</td><td>FortiGate SSL-VPN, Windows 4624/4625, Entra ID sign-ins</td></tr>
+    <tr><td><b>SF-PROC-001</b></td><td>Suspicious command lines: encoded PowerShell, LOLBins (certutil, mshta, rundll32…), Office spawning shells</td><td>Windows 4688 with command line, Sysmon 1</td></tr>
+    <tr><td><b>SF-IAM-001</b></td><td>New account added to a privileged group or role within 30 minutes</td><td>Windows 4720 + 4728/4732/4756, Entra ID audit</td></tr>
+    <tr><td><b>SF-DEF-001</b></td><td>Audit log cleared or logging service stopped</td><td>Windows 1102/104, 7036</td></tr>
+    <tr><td><b>SF-NET-001</b></td><td>Outbound connections on remote-access ports, large uploads, watchlisted destinations</td><td>FortiGate traffic, Sysmon 3</td></tr>
+    <tr><td><b>SF-MAIL-001</b></td><td>An emailed link visited by the recipient within an hour</td><td>Email gateway + DNS / web filter (FortiGate)</td></tr>
+    <tr><td><b>SF-EXT-001</b></td><td>Medium/high alerts from security products</td><td>FortiGate IPS/AV, Microsoft Defender</td></tr>
+  </table>
+</section>
+
+<!-- ============================== 2 ============================== -->
+<section class="chapter">
+  <h2>2. Before you start</h2>
+  <h3>You need</h3>
+  <ul class="check">
+    <li>A SentinelForge <b>administrator</b> account (only admins can create data sources and keys; demo accounts cannot).</li>
+    <li>For each source, a machine that can reach <code>https://sentinelforge-api.kuinkel.com</code> on TCP 443 (outbound HTTPS).</li>
+    <li>The connector scripts from the repository folder <code>connectors/</code>:
+      <ul>
+        <li><code>connectors/fortigate/fortigate_relay.py</code></li>
+        <li><code>connectors/windows/Send-WindowsEvents.ps1</code></li>
+        <li><code>connectors/microsoft-graph/ship_graph_logs.py</code></li>
+      </ul>
+    </li>
+    <li>Python 3.10 or newer for the Python connectors (no extra packages). Windows PowerShell 5.1 or PowerShell 7 for the Windows shipper.</li>
+  </ul>
+
+  <h3>Check connectivity</h3>
+  <p>From the machine that will run a shipper, the health check must return <code>"status":"ok"</code>:</p>
+<pre><span class="c"># Windows PowerShell</span>
+Invoke-RestMethod https://sentinelforge-api.kuinkel.com/api/v1/health
+
+<span class="c"># Linux / macOS</span>
+curl -s https://sentinelforge-api.kuinkel.com/api/v1/health</pre>
+  <p>If your network uses an outbound proxy, set <code>HTTPS_PROXY</code> for the Python connectors (they honour it) or use <code>-Proxy</code> with PowerShell.</p>
+
+  <h3>Handling ingest keys safely</h3>
+  <div class="warn"><b>Treat every ingest key like a password.</b>
+    <ul style="margin:0">
+      <li>Store it in an environment variable or a file readable only by the service account. Never put it on a command line, in a script, a ticket, chat or email.</li>
+      <li>Use one key per source so you can revoke one without affecting the others.</li>
+      <li>If a key may have leaked, <b>Rotate</b> it (Settings → Data sources). The old key stops working at once.</li>
+    </ul>
+  </div>
+
+  <h3>Free-tier capacity</h3>
+  <p>The hosted database has 0.5 GB. Security events (logins, alerts, admin changes) are small and always worth sending. High-volume traffic logs are filtered by default in the FortiGate relay; keep the default unless you have a larger database.</p>
+</section>
+
+<!-- ============================== 3 ============================== -->
+<section class="chapter">
+  <h2>3. Create a data source and ingest key</h2>
+  <div class="step"><div class="n">1</div><div class="b"><p>Sign in at <a href="https://sentinelforge.kuinkel.com">https://sentinelforge.kuinkel.com</a> with an administrator account.</p></div></div>
+  <div class="step"><div class="n">2</div><div class="b"><p>Open <b>Settings</b> (left sidebar, under <i>Govern</i>) and find the <b>Data sources</b> panel. Click <b>Add source</b>.</p></div></div>
+  <div class="step"><div class="n">3</div><div class="b"><p>Enter a clear <b>Name</b> (for example <i>FortiGate HQ</i>, <i>DC01 Security log</i>, <i>Entra ID</i>) and choose the <b>Type</b>:</p>
+    <table>
+      <tr><th>Connecting</th><th>Type</th></tr>
+      <tr><td>FortiGate firewall</td><td><code>fortigate</code></td></tr>
+      <tr><td>Windows Security / System log</td><td><code>windows_security</code></td></tr>
+      <tr><td>Sysmon (separate source, optional)</td><td><code>sysmon</code></td></tr>
+      <tr><td>Entra ID sign-in and audit logs</td><td><code>microsoft_entra</code></td></tr>
+      <tr><td>Microsoft Defender alerts</td><td><code>microsoft_defender</code></td></tr>
+      <tr><td>Anything else</td><td>closest match, or <code>custom</code></td></tr>
+    </table></div></div>
+  <div class="step"><div class="n">4</div><div class="b"><p>Click <b>Create and show key</b>. Copy the key (it starts with <code>sfk_</code>) into your password manager or straight into the shipper's configuration, then click <b>I have stored it</b>. <b>It cannot be shown again.</b></p></div></div>
+
+  <div class="shot"><div class="crop" style="aspect-ratio: 1112 / 222;"><img src="assets/settings-light.png" alt="Data sources panel" style="width:129.5%; margin-left:-25.9%; margin-top:-43.2%;"></div></div>
+  <p class="caption">Figure 1 – Settings → Data sources. Each row shows health, type, event count, last event and the first characters of the key.</p>
+
+  <h3>Managing keys later</h3>
+  <table>
+    <tr><th style="width:30mm">Button</th><th>What it does</th><th>When to use it</th></tr>
+    <tr><td><b>Rotate key</b></td><td>Issues a new key and invalidates the old one immediately. The new key is shown once.</td><td>Scheduled rotation, staff changes, suspected exposure. Update the shipper with the new key right away.</td></tr>
+    <tr><td><b>Revoke key</b></td><td>Invalidates the key; the source and its events are kept. Shippers using it get <code>401</code>.</td><td>Decommissioning a log sender, or stopping a misbehaving one.</td></tr>
+    <tr><td><b>Issue key</b></td><td>Creates a key for a source whose key was revoked.</td><td>Re-enabling a source.</td></tr>
+    <tr><td><b>Delete</b></td><td>Removes the source. Only offered when it has <b>no</b> stored events, so evidence is never lost.</td><td>Cleaning up a source created by mistake.</td></tr>
+  </table>
+  <div class="note"><b>Removing people instead of keys?</b> Settings → <i>Users and roles</i> → <b>Remove</b> signs the person out everywhere and blocks sign-in while keeping their history. Ingest keys are not tied to people, so removing a user does not stop any shipper.</div>
+</section>
+
+<!-- ============================== 4 FORTIGATE ============================== -->
+<section class="chapter">
+  <h2>4. FortiGate firewall</h2>
+  <p class="lead">FortiGate sends logs only as syslog. A small relay program inside your network receives the syslog and forwards it to SentinelForge over HTTPS.</p>
+  <div class="flow" style="grid-template-columns: 1fr 9mm 1fr 9mm 1fr;">
+    <div class="box"><b>FortiGate</b>Remote logging: syslog to the relay, UDP or TCP port 5514</div>
+    <div class="arrow">→</div>
+    <div class="box hl"><b>Relay machine (your LAN)</b><code>fortigate_relay.py</code><br>Accepts only the firewall's IP, filters noise, batches every 5 s</div>
+    <div class="arrow">→</div>
+    <div class="box"><b>SentinelForge</b><code>/api/v1/ingest/fortigate</code></div>
+  </div>
+
+  <h3>What is collected</h3>
+  <table>
+    <tr><th>FortiGate log</th><th>Becomes</th><th>Detection</th></tr>
+    <tr><td>SSL-VPN login failures and tunnels established</td><td>Login failure / success</td><td>VPN password guessing (SF-AUTH-001)</td></tr>
+    <tr><td>Administrator logins to the firewall</td><td>Login failure / success</td><td>SF-AUTH-001</td></tr>
+    <tr><td>Accepted traffic sessions (filtered)</td><td>Network connection</td><td>SF-NET-001</td></tr>
+    <tr><td>DNS filter, web filter</td><td>DNS query, web request</td><td>SF-MAIL-001</td></tr>
+    <tr><td>IPS, antivirus, anomaly, blocked application control</td><td>Security alert</td><td>SF-EXT-001</td></tr>
+  </table>
+
+  <h3>4.1 Create the data source</h3>
+  <p>Follow chapter 3 with type <code>fortigate</code> (for example “FortiGate HQ”). Keep the <code>sfk_</code> key ready.</p>
+
+  <h3>4.2 Prepare the relay machine</h3>
+  <p>Any always-on machine on the LAN that the FortiGate can reach: a small Linux VM, a Windows server, or a Raspberry Pi. Requirements: Python 3.10+, outbound HTTPS, and inbound <b>UDP and TCP 5514</b> from the FortiGate.</p>
+  <h4>Option A – Windows server</h4>
+  <div class="step"><div class="n">1</div><div class="b"><p>Install Python 3 from python.org (tick <i>Add python.exe to PATH</i>). Copy <code>fortigate_relay.py</code> to <code>C:\SentinelForge\</code>.</p></div></div>
+  <div class="step"><div class="n">2</div><div class="b"><p>Allow the syslog port through Windows Firewall (PowerShell as Administrator; use your FortiGate's IP):</p>
+<pre>New-NetFirewallRule -DisplayName "SentinelForge relay UDP" -Direction Inbound -Protocol UDP -LocalPort 5514 -RemoteAddress 192.168.1.99 -Action Allow
+New-NetFirewallRule -DisplayName "SentinelForge relay TCP" -Direction Inbound -Protocol TCP -LocalPort 5514 -RemoteAddress 192.168.1.99 -Action Allow</pre></div></div>
+  <div class="step"><div class="n">3</div><div class="b"><p>Store the settings as machine environment variables (not in the script):</p>
+<pre>[Environment]::SetEnvironmentVariable("SENTINELFORGE_URL", "https://sentinelforge-api.kuinkel.com", "Machine")
+[Environment]::SetEnvironmentVariable("SENTINELFORGE_INGEST_KEY", "sfk_paste_your_key_here", "Machine")</pre></div></div>
+  <div class="step"><div class="n">4</div><div class="b"><p>Test it in a new PowerShell window; it should print <i>Listening for FortiGate syslog…</i>:</p>
+<pre>python C:\SentinelForge\fortigate_relay.py --allow 192.168.1.99</pre></div></div>
+  <div class="step"><div class="n">5</div><div class="b"><p>Run it permanently as a startup task (Administrator PowerShell):</p>
+<pre>$action  = New-ScheduledTaskAction -Execute "python.exe" -Argument "C:\SentinelForge\fortigate_relay.py --allow 192.168.1.99"
+$trigger = New-ScheduledTaskTrigger -AtStartup
+$settings = New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero)
+Register-ScheduledTask -TaskName "SentinelForge FortiGate relay" -Action $action -Trigger $trigger -Settings $settings -User "SYSTEM" -RunLevel Highest
+Start-ScheduledTask -TaskName "SentinelForge FortiGate relay"</pre></div></div>
+
+  <h4>Option B – Linux (systemd)</h4>
+<pre>sudo mkdir -p /opt/sentinelforge /etc/sentinelforge
+sudo cp fortigate_relay.py /opt/sentinelforge/
+sudo tee /etc/sentinelforge/relay.env &gt;/dev/null &lt;&lt;'EOF'
+SENTINELFORGE_URL=https://sentinelforge-api.kuinkel.com
+SENTINELFORGE_INGEST_KEY=sfk_paste_your_key_here
+EOF
+sudo chmod 600 /etc/sentinelforge/relay.env
+
+sudo tee /etc/systemd/system/sentinelforge-relay.service &gt;/dev/null &lt;&lt;'EOF'
+[Unit]
+Description=SentinelForge FortiGate syslog relay
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+EnvironmentFile=/etc/sentinelforge/relay.env
+ExecStart=/usr/bin/python3 /opt/sentinelforge/fortigate_relay.py --allow 192.168.1.99
+DynamicUser=yes
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+sudo systemctl daemon-reload
+sudo systemctl enable --now sentinelforge-relay
+sudo journalctl -u sentinelforge-relay -f      <span class="c"># watch the log</span>
+sudo ufw allow from 192.168.1.99 to any port 5514   <span class="c"># if ufw is enabled</span></pre>
+
+  <h4>Relay options</h4>
+  <table>
+    <tr><th style="width:46mm">Option</th><th>Meaning</th></tr>
+    <tr><td><code>--allow</code> <span class="tag req">required</span></td><td>Comma-separated IPs of your FortiGate(s). Packets from any other address are dropped, so nobody can inject fake firewall logs.</td></tr>
+    <tr><td><code>--port</code> <span class="tag opt">5514</span></td><td>UDP and TCP port to listen on. 5514 avoids needing administrator rights for port 514.</td></tr>
+    <tr><td><code>--traffic</code> <span class="tag opt">interesting</span></td><td><b>interesting</b>: only accepted sessions to public addresses on unusual ports or with more than 10 MiB sent. <b>all</b>: every session (very high volume). <b>none</b>: no traffic logs. VPN, admin, DNS, web filter and IPS logs are always sent.</td></tr>
+    <tr><td><code>--bind</code> <span class="tag opt">0.0.0.0</span></td><td>Local address to listen on; set the LAN IP to listen on one interface only.</td></tr>
+    <tr><td><code>--batch</code><br><code>--interval</code></td><td>Up to 200 lines per request, sent every 5 seconds.</td></tr>
+    <tr><td><code>--buffer</code> <span class="tag opt">50000</span></td><td>Lines kept in memory while SentinelForge is unreachable; the relay retries automatically.</td></tr>
+  </table>
+
+  <h3>4.3 Configure the FortiGate</h3>
+  <h4>Using the CLI (recommended)</h4>
+  <p>Open the CLI console (top right in the GUI, or SSH) and run, replacing <code>192.168.1.50</code> with the relay machine's IP:</p>
+<pre>config log syslogd setting
+    set status enable
+    set server "192.168.1.50"
+    set port 5514
+    set mode udp                 <span class="c"># or "reliable" for TCP</span>
+    set format default           <span class="c"># "json" is also supported</span>
+    set facility local7
+end
+
+config log syslogd filter
+    set severity information
+    set forward-traffic enable
+    set local-traffic disable
+    set multicast-traffic disable
+    set sniffer-traffic disable
+    set anomaly enable
+    set voip disable
+end</pre>
+  <p>If the FortiGate sends logs from a management interface or VDOM, pin the source address and put that same IP in the relay's <code>--allow</code>:</p>
+<pre>config log syslogd setting
+    set source-ip 192.168.1.99
+end</pre>
+  <h4>Using the GUI</h4>
+  <ol>
+    <li><b>Log &amp; Report → Log Settings</b> → <i>Remote Logging and Archiving</i>.</li>
+    <li>Enable <b>Send logs to syslog</b> and enter the relay's IP address. Click <b>Apply</b>.</li>
+    <li>The GUI uses port 514 by default; set port 5514 and the mode with the CLI commands above.</li>
+  </ol>
+
+  <h3>4.4 Make sure the right events are logged</h3>
+  <ol>
+    <li><b>Policy &amp; Objects → Firewall Policy</b>: open each Internet-facing policy and set <b>Log Allowed Traffic</b> to <i>All Sessions</i> (or at least <i>Security Events</i>).</li>
+    <li><b>Security Profiles</b>: in the <b>DNS Filter</b>, <b>Web Filter</b> and <b>IPS</b> profiles used by those policies, enable logging (for DNS filter: <i>Log all DNS queries and responses</i>).</li>
+    <li>SSL-VPN logins and administrator logins are logged by default (<b>Log &amp; Report → Log Settings → Event Logging</b>: <i>VPN activity</i> and <i>System activity</i> must be enabled).</li>
+  </ol>
+
+  <h3>4.5 Confirm</h3>
+  <ol>
+    <li>On the FortiGate, check that packets leave towards the relay: <code>diagnose sniffer packet any 'port 5514' 4 5</code>.</li>
+    <li>The relay prints statistics every 5 minutes, for example <code>stats received=812, dropped_filter=640, sent=172, …</code>.</li>
+    <li>In SentinelForge, <b>Settings → Data sources</b> shows the FortiGate as <i>Reporting</i>; <b>Events</b> shows its records. Then run the safe test in chapter 10.</li>
+  </ol>
+</section>
+
+<!-- ============================== 5 WINDOWS ============================== -->
+<section class="chapter">
+  <h2>5. Windows servers and workstations</h2>
+  <p class="lead">The PowerShell shipper runs every 5 minutes on each server (domain controllers first), reads the security-relevant event IDs since its last run, and posts them to SentinelForge.</p>
+
+  <h3>Events collected</h3>
+  <table>
+    <tr><th style="width:30mm">Log</th><th style="width:32mm">Event IDs</th><th>Meaning</th></tr>
+    <tr><td>Security</td><td>4624, 4625</td><td>Successful / failed logon (machine accounts and system logons are skipped)</td></tr>
+    <tr><td>Security</td><td>4688</td><td>Process created (with command line when enabled)</td></tr>
+    <tr><td>Security</td><td>4720</td><td>User account created</td></tr>
+    <tr><td>Security</td><td>4728, 4732, 4756</td><td>Member added to a global / local / universal security group</td></tr>
+    <tr><td>Security</td><td>1102</td><td>Security log cleared</td></tr>
+    <tr><td>System</td><td>7036, 104</td><td>Service stopped (e.g. Windows Event Log, Sysmon); log cleared</td></tr>
+    <tr><td>Sysmon</td><td>1, 3, 22</td><td>Process creation with hashes, network connection, DNS query (only if Sysmon is installed)</td></tr>
+  </table>
+
+  <h3>5.1 Turn on the required auditing</h3>
+  <p>On a domain, set these in a GPO linked to servers and domain controllers: <b>Computer Configuration → Policies → Windows Settings → Security Settings → Advanced Audit Policy Configuration</b>. For a single machine, run in an Administrator command prompt:</p>
+<pre>auditpol /set /subcategory:"Logon" /success:enable /failure:enable
+auditpol /set /subcategory:"Process Creation" /success:enable
+auditpol /set /subcategory:"User Account Management" /success:enable /failure:enable
+auditpol /set /subcategory:"Security Group Management" /success:enable
+auditpol /set /subcategory:"Audit Policy Change" /success:enable</pre>
+  <p>Include command lines in event 4688 (needed for suspicious-process detection). GPO: <b>Administrative Templates → System → Audit Process Creation → Include command line in process creation events = Enabled</b>, or on one machine:</p>
+<pre>reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System\Audit" /v ProcessCreationIncludeCmdLine_Enabled /t REG_DWORD /d 1 /f</pre>
+  <div class="note"><b>Optional: Sysmon</b> adds file hashes, network connections and DNS queries per process. Install it from Microsoft Sysinternals with a community configuration (for example SwiftOnSecurity's) — the shipper picks it up automatically.</div>
+
+  <h3>5.2 Install the shipper</h3>
+  <div class="step"><div class="n">1</div><div class="b"><p>Create a data source (chapter 3), type <code>windows_security</code>, one per server or one shared by a group of servers.</p></div></div>
+  <div class="step"><div class="n">2</div><div class="b"><p>Copy <code>Send-WindowsEvents.ps1</code> to <code>C:\SentinelForge\</code> on the server.</p></div></div>
+  <div class="step"><div class="n">3</div><div class="b"><p>Store the key at machine level (Administrator PowerShell):</p>
+<pre>[Environment]::SetEnvironmentVariable("SENTINELFORGE_INGEST_KEY", "sfk_paste_your_key_here", "Machine")</pre></div></div>
+  <div class="step"><div class="n">4</div><div class="b"><p>Run it once by hand to test (Administrator PowerShell, because the Security log requires it):</p>
+<pre>powershell -NoProfile -ExecutionPolicy Bypass -File C:\SentinelForge\Send-WindowsEvents.ps1 -ApiUrl https://sentinelforge-api.kuinkel.com</pre>
+  <p>Expected output: <code>… sent 214 events, 214 new, 0 alerts raised</code>. The first run reads the last 60 minutes (<code>-LookbackMinutes</code> changes this).</p></div></div>
+  <div class="step"><div class="n">5</div><div class="b"><p>Schedule it every 5 minutes as SYSTEM:</p>
+<pre>$action  = New-ScheduledTaskAction -Execute "powershell.exe" -Argument '-NoProfile -ExecutionPolicy Bypass -File "C:\SentinelForge\Send-WindowsEvents.ps1" -ApiUrl https://sentinelforge-api.kuinkel.com'
+$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5)
+Register-ScheduledTask -TaskName "SentinelForge event shipper" -Action $action -Trigger $trigger -User "SYSTEM" -RunLevel Highest</pre></div></div>
+
+  <h3>Shipper options</h3>
+  <table>
+    <tr><th style="width:50mm">Parameter</th><th>Meaning</th></tr>
+    <tr><td><code>-ApiUrl</code> <span class="tag req">required</span></td><td>https://sentinelforge-api.kuinkel.com</td></tr>
+    <tr><td><code>-StateFile</code></td><td>Where the last-sent time is kept (default <code>C:\ProgramData\SentinelForge\windows-events.state</code>). Delete it to resend the lookback window; duplicates are ignored.</td></tr>
+    <tr><td><code>-LookbackMinutes</code> <span class="tag opt">60</span></td><td>How far back the first run reads.</td></tr>
+    <tr><td><code>-IncludeNetworkLogons</code></td><td>Also send successful network logons (type 3). Very frequent on servers; failures are always sent.</td></tr>
+    <tr><td><code>-BatchSize</code> <span class="tag opt">200</span></td><td>Events per request.</td></tr>
+  </table>
+</section>
+
+<!-- ============================== 6 MICROSOFT ============================== -->
+<section class="chapter">
+  <h2>6. Microsoft Entra ID and Microsoft Defender</h2>
+  <p class="lead">The Graph shipper reads Entra ID sign-in and audit logs and Defender XDR alerts from Microsoft Graph using an app registration, and posts them to SentinelForge. Run it on any always-on machine with outbound HTTPS.</p>
+
+  <table>
+    <tr><th>Stream</th><th>Graph source</th><th>Permission</th><th>Licence</th></tr>
+    <tr><td><code>entra-signin</code></td><td>/auditLogs/signIns</td><td>AuditLog.Read.All, Directory.Read.All</td><td><b>Entra ID P1 or P2</b></td></tr>
+    <tr><td><code>entra-audit</code></td><td>/auditLogs/directoryAudits</td><td>AuditLog.Read.All</td><td>Any</td></tr>
+    <tr><td><code>defender-alert</code></td><td>/security/alerts_v2</td><td>SecurityAlert.Read.All</td><td>Defender for Endpoint / Office 365 / Identity, or Microsoft 365 E5 / Business Premium</td></tr>
+  </table>
+  <div class="note"><b>MFA prompts are not failures.</b> Sign-in records that only asked for MFA, "Stay signed in?" or a password change are skipped, so normal MFA use never looks like password guessing.</div>
+
+  <h3>6.1 Register the application</h3>
+  <div class="step"><div class="n">1</div><div class="b"><p>Open <b>entra.microsoft.com</b> as a Global Administrator or Privileged Role Administrator → <b>Applications → App registrations → New registration</b>. Name: <i>SentinelForge log shipper</i>; <i>Accounts in this organizational directory only</i>; no redirect URI. Click <b>Register</b>.</p></div></div>
+  <div class="step"><div class="n">2</div><div class="b"><p>On the <b>Overview</b> page copy the <b>Directory (tenant) ID</b> and <b>Application (client) ID</b>.</p></div></div>
+  <div class="step"><div class="n">3</div><div class="b"><p><b>API permissions → Add a permission → Microsoft Graph → Application permissions</b>. Add <code>AuditLog.Read.All</code>, <code>Directory.Read.All</code> and <code>SecurityAlert.Read.All</code>. Then click <b>Grant admin consent for &lt;your tenant&gt;</b>; every permission must show a green tick.</p></div></div>
+  <div class="step"><div class="n">4</div><div class="b"><p><b>Certificates &amp; secrets → Client secrets → New client secret</b>, expiry 6–12 months. Copy the secret <b>Value</b> immediately (it is hidden afterwards). Put a reminder in your calendar to renew it before it expires.</p></div></div>
+
+  <h3>6.2 Create data sources</h3>
+  <p>Create one source of type <code>microsoft_entra</code> (sign-ins and audit) — and optionally a separate <code>microsoft_defender</code> source if you want separate health tracking. One key can serve all three streams.</p>
+
+  <h3>6.3 Configure and run the shipper</h3>
+  <div class="step"><div class="n">1</div><div class="b"><p>Copy <code>ship_graph_logs.py</code> to the machine (e.g. <code>C:\SentinelForge\</code> or <code>/opt/sentinelforge/</code>).</p></div></div>
+  <div class="step"><div class="n">2</div><div class="b"><p>Set the configuration as environment variables for the account that will run it:</p>
+<pre><span class="c"># Windows (PowerShell); use "Machine" if it will run as SYSTEM</span>
+[Environment]::SetEnvironmentVariable("MS_TENANT_ID", "&lt;tenant id&gt;", "User")
+[Environment]::SetEnvironmentVariable("MS_CLIENT_ID", "&lt;client id&gt;", "User")
+[Environment]::SetEnvironmentVariable("MS_CLIENT_SECRET", "&lt;secret value&gt;", "User")
+[Environment]::SetEnvironmentVariable("SENTINELFORGE_URL", "https://sentinelforge-api.kuinkel.com", "User")
+[Environment]::SetEnvironmentVariable("SENTINELFORGE_INGEST_KEY", "sfk_paste_your_key_here", "User")
+
+<span class="c"># Linux: put the same five lines (NAME=value) in /etc/sentinelforge/graph.env, chmod 600</span></pre></div></div>
+  <div class="step"><div class="n">3</div><div class="b"><p>Run once to test:</p>
+<pre>python ship_graph_logs.py
+<span class="c"># without an Entra ID P1/P2 licence:</span>
+python ship_graph_logs.py --streams entra-audit,defender-alert</pre>
+  <p>Expected output, one line per stream: <code>entra-signin: 120 fetched, 120 new, 0 duplicate, 3 skipped, 0 alerts</code>.</p></div></div>
+  <div class="step"><div class="n">4</div><div class="b"><p>Run it continuously or on a schedule:</p>
+<pre><span class="c"># keep running, one pass every 5 minutes</span>
+python ship_graph_logs.py --loop 300
+
+<span class="c"># or Windows Task Scheduler every 5 minutes</span>
+$action  = New-ScheduledTaskAction -Execute "python.exe" -Argument "C:\SentinelForge\ship_graph_logs.py"
+$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5)
+Register-ScheduledTask -TaskName "SentinelForge Graph shipper" -Action $action -Trigger $trigger
+
+<span class="c"># or Linux cron (as the user that owns graph.env)</span>
+*/5 * * * * set -a; . /etc/sentinelforge/graph.env; /usr/bin/python3 /opt/sentinelforge/ship_graph_logs.py</pre></div></div>
+
+  <h3>Shipper options</h3>
+  <table>
+    <tr><th style="width:38mm">Option</th><th>Meaning</th></tr>
+    <tr><td><code>--streams</code></td><td>Comma-separated: <code>entra-signin</code>, <code>entra-audit</code>, <code>defender-alert</code> (default all).</td></tr>
+    <tr><td><code>--lookback</code> <span class="tag opt">60</span></td><td>Minutes fetched on the first run.</td></tr>
+    <tr><td><code>--state</code></td><td>Checkpoint file (default next to the script). Each stream continues from its last record.</td></tr>
+    <tr><td><code>--loop</code></td><td>Seconds between passes; 0 runs once.</td></tr>
+  </table>
+  <p>The shipper waits and retries automatically when Microsoft Graph throttles (HTTP 429). Microsoft makes new sign-in records available after a few minutes; that delay is normal.</p>
+</section>
+
+<!-- ============================== 7 AZURE MONITOR ============================== -->
+<section class="chapter">
+  <h2>7. Azure Monitor, Log Analytics and Microsoft Sentinel</h2>
+  <p class="lead">If your logs already flow into a Log Analytics workspace (Microsoft Sentinel, Defender for Cloud, Azure Monitor Agent), you can forward them without running anything on your servers, using a Logic App.</p>
+  <h3>7.1 Store the ingest key in Key Vault</h3>
+  <ol>
+    <li>Create a data source in SentinelForge (chapter 3) and copy the key.</li>
+    <li>In the Azure portal open (or create) a <b>Key Vault</b> → <b>Secrets → Generate/Import</b>, name <code>sentinelforge-ingest-key</code>, value = the key.</li>
+  </ol>
+  <h3>7.2 Build the Logic App</h3>
+  <div class="step"><div class="n">1</div><div class="b"><p>Create a <b>Logic App (Consumption)</b>. Under <b>Identity</b> enable the system-assigned managed identity, and give it <b>Log Analytics Reader</b> on the workspace and <b>Key Vault Secrets User</b> on the vault.</p></div></div>
+  <div class="step"><div class="n">2</div><div class="b"><p>Trigger: <b>Recurrence</b>, every 5 minutes.</p></div></div>
+  <div class="step"><div class="n">3</div><div class="b"><p>Action: <b>Azure Monitor Logs → Run query and list results</b> on your workspace with one of these queries (time range: last 5 minutes):</p>
+<pre><span class="c">// Windows security events  → endpoint .../ingest/microsoft/windows-event</span>
+SecurityEvent
+| where EventID in (4624, 4625, 4688, 4720, 4728, 4732, 4756, 1102)
+| project TimeGenerated, Computer, EventID, EventData
+
+<span class="c">// Entra ID sign-ins → .../ingest/microsoft/entra-signin</span>
+SigninLogs
+| project TimeGenerated, UserPrincipalName, IPAddress, ResultType, ResultDescription, AppDisplayName, LocationDetails, DeviceDetail
+
+<span class="c">// Entra ID audit → .../ingest/microsoft/entra-audit</span>
+AuditLogs
+| where OperationName in ("Add user", "Add member to role", "Add member to group", "Add eligible member to role")
+| project TimeGenerated, OperationName, Result, InitiatedBy, TargetResources
+
+<span class="c">// Security alerts → .../ingest/microsoft/defender-alert</span>
+SecurityAlert
+| project TimeGenerated, AlertName, AlertSeverity, ProviderName, CompromisedEntity, Description</pre></div></div>
+  <div class="step"><div class="n">4</div><div class="b"><p>Action: <b>Azure Key Vault → Get secret</b> <code>sentinelforge-ingest-key</code>. In its <i>Settings</i>, turn on <b>Secure outputs</b> so the key never appears in run history.</p></div></div>
+  <div class="step"><div class="n">5</div><div class="b"><p>Action: <b>HTTP</b></p>
+  <dl class="kv">
+    <dt>Method</dt><dd>POST</dd>
+    <dt>URI</dt><dd><code>https://sentinelforge-api.kuinkel.com/api/v1/ingest/microsoft/windows-event</code> (or the endpoint matching the query)</dd>
+    <dt>Headers</dt><dd><code>Authorization</code>: <code>Bearer @{body('Get_secret')?['value']}</code><br><code>Content-Type</code>: <code>application/json</code></dd>
+    <dt>Body</dt><dd><code>@{body('Run_query_and_list_results')?['value']}</code></dd>
+  </dl>
+  <p>Turn on <b>Secure inputs</b> for this action as well. If more than 500 rows can arrive in 5 minutes, run the trigger more often or add a <i>Chunk</i> step (batches of 500).</p></div></div>
+  <div class="step"><div class="n">6</div><div class="b"><p>Save, click <b>Run</b>, and check the HTTP action's output: <code>{"received": …, "inserted": …, "skipped": …}</code>.</p></div></div>
+</section>
+
+<!-- ============================== 8 GENERIC ============================== -->
+<section class="chapter">
+  <h2>8. Any other source: the JSON ingestion API</h2>
+  <p class="lead">Anything that can make an HTTPS request — a Linux server script, a SaaS webhook, a SIEM export, an EDR — can send events directly in SentinelForge's normalised format.</p>
+
+  <h3>Request</h3>
+<pre>POST https://sentinelforge-api.kuinkel.com/api/v1/ingest/events
+Authorization: Bearer sfk_...
+Content-Type: application/json
+
+{
+  "events": [
+    {
+      "event_time": "2026-10-27T09:15:00Z",
+      "event_type": "auth.failure",
+      "host": "web-01",
+      "user_name": "j.doe",
+      "src_ip": "203.0.113.45",
+      "outcome": "failure",
+      "message": "sshd: Failed password for j.doe",
+      "raw": {"program": "sshd", "pid": 4123}
+    }
+  ],
+  "run_detection": true
+}</pre>
+  <p>Response: <code>{"received": 1, "inserted": 1, "duplicates": 0, "alerts_created": 0, "alerts_updated": 0, "skipped": 0}</code></p>
+
+  <h3>Event types</h3>
+  <table>
+    <tr><th style="width:44mm">event_type</th><th>Use for</th><th>Important fields</th></tr>
+    <tr><td><code>auth.success</code> / <code>auth.failure</code></td><td>Logins (VPN, SSH, web apps, AD)</td><td>user_name, src_ip, host</td></tr>
+    <tr><td><code>process.start</code></td><td>Process creation</td><td>host, process_name, command_line, parent_process, file_hash</td></tr>
+    <tr><td><code>iam.user_created</code></td><td>Account creation</td><td>target_user, user_name (who did it)</td></tr>
+    <tr><td><code>iam.group_member_added</code></td><td>Group / role membership added</td><td>target_user, group_name</td></tr>
+    <tr><td><code>log.cleared</code></td><td>Audit log cleared</td><td>host, user_name</td></tr>
+    <tr><td><code>service.stopped</code></td><td>Service stopped</td><td>host, process_name (service name)</td></tr>
+    <tr><td><code>network.connection</code></td><td>Firewall / flow records</td><td>src_ip, dst_ip, dst_port, bytes_out, host</td></tr>
+    <tr><td><code>dns.query</code></td><td>DNS lookups</td><td>domain, host or src_ip</td></tr>
+    <tr><td><code>proxy.request</code></td><td>Web / proxy requests</td><td>url, domain, user_name, host</td></tr>
+    <tr><td><code>email.delivered</code></td><td>Mail gateway deliveries</td><td>email_sender, email_subject, user_name (recipient), url, domain</td></tr>
+    <tr><td><code>file.created</code></td><td>File creation</td><td>host, file_hash, process_name</td></tr>
+    <tr><td><code>security.alert</code></td><td>Alerts from other security tools</td><td>outcome = severity (low/medium/high), message = title, host, user_name</td></tr>
+  </table>
+
+  <h3>Examples</h3>
+  <h4>curl (Linux / macOS)</h4>
+<pre>curl -sS -X POST https://sentinelforge-api.kuinkel.com/api/v1/ingest/events \
+  -H "Authorization: Bearer $SENTINELFORGE_INGEST_KEY" -H "Content-Type: application/json" \
+  -d '{"events":[{"event_time":"2026-10-27T09:15:00Z","event_type":"auth.failure","host":"web-01","user_name":"j.doe","src_ip":"203.0.113.45"}]}'</pre>
+  <h4>PowerShell</h4>
+<pre>$body = @{ events = @(@{ event_time = (Get-Date).ToUniversalTime().ToString("o"); event_type = "auth.failure"
+                         host = "web-01"; user_name = "j.doe"; src_ip = "203.0.113.45" }) } | ConvertTo-Json -Depth 5
+Invoke-RestMethod -Method Post -Uri https://sentinelforge-api.kuinkel.com/api/v1/ingest/events `
+  -Headers @{ Authorization = "Bearer $env:SENTINELFORGE_INGEST_KEY" } -ContentType "application/json" -Body $body</pre>
+  <h4>Python</h4>
+<pre>import os, json, urllib.request, datetime
+event = {"event_time": datetime.datetime.now(datetime.UTC).isoformat(), "event_type": "auth.failure",
+         "host": "web-01", "user_name": "j.doe", "src_ip": "203.0.113.45"}
+req = urllib.request.Request("https://sentinelforge-api.kuinkel.com/api/v1/ingest/events",
+    data=json.dumps({"events": [event]}).encode(), method="POST",
+    headers={"Authorization": f"Bearer {os.environ['SENTINELFORGE_INGEST_KEY']}", "Content-Type": "application/json"})
+print(urllib.request.urlopen(req, timeout=30).read().decode())</pre>
+
+  <h3>Rules</h3>
+  <ul>
+    <li>1–500 events per request, body up to 1 MiB, at most 60 requests per minute per data source.</li>
+    <li><code>event_time</code> must include a time zone (e.g. <code>Z</code>) and may not be more than 5 minutes in the future.</li>
+    <li>Unknown fields are rejected; put extra vendor data in <code>raw</code> (any JSON object).</li>
+    <li>Sending the same event twice is harmless: duplicates are detected and ignored.</li>
+  </ul>
+</section>
+
+<!-- ============================== 9 THREAT INTEL ============================== -->
+<section class="chapter">
+  <h2>9. Threat-intelligence providers</h2>
+  <p class="lead">When an analyst investigates an IP, domain, URL or file hash, SentinelForge asks each configured provider. Provider API keys are set on the server (Vercel), never in the web interface.</p>
+  <table>
+    <tr><th style="width:30mm">Provider</th><th style="width:48mm">Environment variable</th><th>Where to get the key</th></tr>
+    <tr><td><b>NepSec Intel</b></td><td><code>NEPSECINTEL_API_KEY</code></td><td>nepsecintel.kuinkel.com → <b>Workspace → API keys</b> (admin or Pro account). Key starts with <code>tl_</code>.</td></tr>
+    <tr><td>VirusTotal</td><td><code>VIRUSTOTAL_API_KEY</code></td><td>virustotal.com → your profile → <b>API key</b></td></tr>
+    <tr><td>AbuseIPDB</td><td><code>ABUSEIPDB_API_KEY</code></td><td>abuseipdb.com → <b>Account → API</b></td></tr>
+    <tr><td>AlienVault OTX</td><td><code>OTX_API_KEY</code></td><td>otx.alienvault.com → <b>Settings → OTX Key</b></td></tr>
+  </table>
+  <h3>Connect NepSec Intel (recommended)</h3>
+  <div class="step"><div class="n">1</div><div class="b"><p>Sign in at <b>https://nepsecintel.kuinkel.com</b> with an administrator or Pro account.</p></div></div>
+  <div class="step"><div class="n">2</div><div class="b"><p>Open <b>Workspace → API keys</b>, create a key named <i>SentinelForge</i>, and copy it (shown once).</p></div></div>
+  <div class="step"><div class="n">3</div><div class="b"><p>In <b>vercel.com</b> open project <b>sentinelforge-api → Settings → Environment Variables → Add New</b>: Key <code>NEPSECINTEL_API_KEY</code>, Value = the key, environments <i>Production</i> and <i>Preview</i>, tick <b>Sensitive</b>, <b>Save</b>.</p></div></div>
+  <div class="step"><div class="n">4</div><div class="b"><p><b>Deployments</b> → the latest production deployment → <b>⋯ → Redeploy</b>. New variables apply only after a redeploy.</p></div></div>
+  <div class="step"><div class="n">5</div><div class="b"><p>In SentinelForge, <b>Settings → Threat intelligence integrations</b> now shows <i>NepSec Intel: Configured</i>. On <b>Threat intel</b>, investigate an indicator: the NepSec Intel card shows its risk score, top findings and an <b>Open full report</b> link.</p></div></div>
+  <div class="note"><b>How verdicts are shown.</b> A provider reporting nothing is shown as <i>unknown</i>, never as <i>safe</i>. Results are cached for 24 hours per provider; use <b>Refresh</b> to bypass the cache. The analyst's own verdict is kept separately and, when set to <i>malicious</i>, adds the indicator to the network detection watchlist.</div>
+</section>
+
+<!-- ============================== 10 VERIFY ============================== -->
+<section class="chapter">
+  <h2>10. Verify the connection</h2>
+  <h3>10.1 Health and events</h3>
+  <ol>
+    <li><b>Settings → Data sources</b>: the source shows <i>Reporting</i> (an event in the last 24 hours) and a growing event count.</li>
+    <li><b>Events</b>: filter by the data source; open an event to see the normalised fields and the original record under <i>raw</i>.</li>
+    <li><b>Overview → Telemetry health</b> lists every source with its last event time.</li>
+  </ol>
+  <h3>10.2 Safe test alerts</h3>
+  <p>These create harmless, clearly identifiable activity. Tell your team before running them, then close the resulting alerts as <i>Benign positive</i> with a note.</p>
+  <table>
+    <tr><th style="width:32mm">Source</th><th>Test</th><th style="width:28mm">Expected alert</th></tr>
+    <tr><td>FortiGate SSL-VPN</td><td>From one outside IP, sign in to the SSL-VPN portal with a test account and a wrong password <b>five times</b>, then the correct password, within 10 minutes.</td><td>SF-AUTH-001 “Sign-in succeeded for &lt;user&gt; after 5 failures”</td></tr>
+    <tr><td>FortiGate IPS</td><td>From a lab machine, browse to the EICAR test file (eicar.org) through a policy with antivirus enabled.</td><td>SF-EXT-001 “FortiGate antivirus: malware EICAR…”</td></tr>
+    <tr><td>Windows</td><td>On a test server, five wrong passwords then a correct one for a test account (RDP or <code>runas</code>).</td><td>SF-AUTH-001</td></tr>
+    <tr><td>Windows</td><td>Create a test user and add it to a privileged test group within 30 minutes, then remove it.<br><code>net user sf-test P@ss-Test-2026! /add</code><br><code>net localgroup Administrators sf-test /add</code></td><td>SF-IAM-001</td></tr>
+    <tr><td>Entra ID</td><td>Create a test user in Entra ID and assign it a privileged role (e.g. User Administrator), then remove it.</td><td>SF-IAM-001</td></tr>
+    <tr><td>Defender</td><td>Run Microsoft's documented Defender for Endpoint detection test on an onboarded device.</td><td>SF-EXT-001</td></tr>
+  </table>
+  <div class="ok"><b>No real network or account needed?</b> Settings → <i>Synthetic scenarios</i> → <b>Inject</b> writes labelled synthetic events through the same pipeline, to see detections end to end.</div>
+</section>
+
+<!-- ============================== 11 TROUBLESHOOTING ============================== -->
+<section class="chapter">
+  <h2>11. Troubleshooting</h2>
+  <h3>HTTP responses from the ingestion API</h3>
+  <table>
+    <tr><th style="width:18mm">Code</th><th style="width:45mm">Meaning</th><th>Fix</th></tr>
+    <tr><td><b>200</b></td><td>Accepted</td><td>Check <code>inserted</code>, <code>duplicates</code> and <code>skipped</code>. Many <code>skipped</code> means the records were not of a supported kind (see the connector's table).</td></tr>
+    <tr><td><b>401</b></td><td>Missing, wrong or revoked key</td><td>Check the environment variable (no spaces or quotes). Rotate the key and update the shipper.</td></tr>
+    <tr><td><b>413</b></td><td>Too many records or body over 1 MiB</td><td>Reduce the batch size (max 500).</td></tr>
+    <tr><td><b>422</b></td><td>Invalid events (generic API)</td><td>The response names the field: timestamp without time zone, unknown field, bad IP, unsupported <code>event_type</code>.</td></tr>
+    <tr><td><b>429</b></td><td>Rate limit (60 requests/minute per source)</td><td>Send larger, less frequent batches. Shippers retry automatically.</td></tr>
+    <tr><td><b>5xx</b></td><td>Server or database temporarily unavailable</td><td>Shippers retry. Check https://sentinelforge-api.kuinkel.com/api/v1/health.</td></tr>
+  </table>
+  <h3>By connector</h3>
+  <table>
+    <tr><th style="width:52mm">Symptom</th><th>Check</th></tr>
+    <tr><td>FortiGate relay: <code>received=0</code></td><td>FortiGate cannot reach the relay: <code>diagnose sniffer packet any 'port 5514' 4</code>; Windows/ufw firewall on the relay; correct server IP in <code>log syslogd setting</code>.</td></tr>
+    <tr><td>FortiGate relay: <code>rejected_source</code> &gt; 0</td><td>The firewall sends from another IP: add it to <code>--allow</code> or set <code>source-ip</code>.</td></tr>
+    <tr><td>FortiGate: events but no traffic</td><td>Policies do not log allowed traffic, or the default <code>--traffic interesting</code> filtered normal HTTPS (expected).</td></tr>
+    <tr><td>Windows shipper: “sent 0 events”</td><td>Not run as Administrator / SYSTEM; auditing not enabled (<code>auditpol /get /category:*</code>); no matching events since the last run.</td></tr>
+    <tr><td>Windows: process alerts never fire</td><td>Command-line logging for 4688 is off (chapter 5.1).</td></tr>
+    <tr><td>Graph shipper: <code>HTTP 403 … Authorization_RequestDenied</code></td><td>Admin consent not granted, or a permission is missing (chapter 6.1 step 3).</td></tr>
+    <tr><td>Graph shipper: sign-ins fail with a licence error</td><td>The tenant has no Entra ID P1/P2: use <code>--streams entra-audit,defender-alert</code>.</td></tr>
+    <tr><td>Graph shipper: <code>invalid_client</code></td><td>The client secret expired or was copied as the secret ID instead of the Value.</td></tr>
+    <tr><td>Source shows <i>Stale</i></td><td>No event for 24 hours: the shipper stopped (check its scheduled task / service) or the source is quiet.</td></tr>
+  </table>
+</section>
+
+<!-- ============================== 12 CHECKLIST ============================== -->
+<section class="chapter">
+  <h2>12. Security checklist and reference</h2>
+  <div class="two">
+    <div>
+      <h3 style="margin-top:0">Security checklist</h3>
+      <ul class="check">
+        <li>One data source and key per log sender.</li>
+        <li>Keys stored only in environment variables, protected files (chmod 600) or Key Vault.</li>
+        <li>FortiGate relay restricted with <code>--allow</code> and a host firewall rule.</li>
+        <li>Shippers run as SYSTEM / a dedicated service account, not a personal account.</li>
+        <li>Graph app registration has only the three read permissions; secret expiry tracked.</li>
+        <li>Keys rotated at least yearly and whenever staff with access leave.</li>
+        <li>Unused sources revoked; mistaken ones deleted.</li>
+        <li>Former staff removed under Settings → Users and roles.</li>
+        <li>Provider keys (NepSec Intel, VirusTotal…) only in Vercel as <i>Sensitive</i>.</li>
+      </ul>
+    </div>
+    <div>
+      <h3 style="margin-top:0">Limits</h3>
+      <table>
+        <tr><th>Limit</th><th>Value</th></tr>
+        <tr><td>Events / records per request</td><td>500</td></tr>
+        <tr><td>Request body</td><td>1 MiB</td></tr>
+        <tr><td>Requests per source</td><td>60 per minute</td></tr>
+        <tr><td>Future timestamps</td><td>max 5 minutes</td></tr>
+        <tr><td>Health “Reporting”</td><td>event within 24 h</td></tr>
+        <tr><td>Threat-intel cache</td><td>24 h per provider</td></tr>
+        <tr><td>Database (free tier)</td><td>0.5 GB</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <h3>Event field reference (generic API)</h3>
+  <table>
+    <tr><th style="width:34mm">Field</th><th style="width:30mm">Type</th><th>Notes</th></tr>
+    <tr><td><code>event_time</code> <span class="tag req">required</span></td><td>ISO 8601 with zone</td><td>When it happened, e.g. <code>2026-10-27T09:15:00Z</code></td></tr>
+    <tr><td><code>event_type</code> <span class="tag req">required</span></td><td>string</td><td>One of the types in chapter 8</td></tr>
+    <tr><td><code>outcome</code></td><td>string ≤ 32</td><td>success / failure / allowed / blocked; severity for <code>security.alert</code></td></tr>
+    <tr><td><code>host</code></td><td>string ≤ 255</td><td>Hostname of the machine involved (creates or updates an asset)</td></tr>
+    <tr><td><code>user_name</code></td><td>string ≤ 255</td><td>Account acting or signing in</td></tr>
+    <tr><td><code>src_ip</code>, <code>dst_ip</code></td><td>IPv4 / IPv6</td><td>Validated</td></tr>
+    <tr><td><code>dst_port</code></td><td>0–65535</td><td></td></tr>
+    <tr><td><code>domain</code>, <code>url</code></td><td>string</td><td>URL up to 2048 characters</td></tr>
+    <tr><td><code>process_name</code>, <code>parent_process</code></td><td>string</td><td>Executable names, e.g. <code>powershell.exe</code></td></tr>
+    <tr><td><code>command_line</code></td><td>string ≤ 8192</td><td>Stored and shown as inert text</td></tr>
+    <tr><td><code>file_hash</code></td><td>string ≤ 128</td><td>MD5, SHA-1 or SHA-256</td></tr>
+    <tr><td><code>target_user</code>, <code>group_name</code></td><td>string</td><td>For IAM events</td></tr>
+    <tr><td><code>email_sender</code>, <code>email_subject</code></td><td>string</td><td>For <code>email.delivered</code></td></tr>
+    <tr><td><code>bytes_out</code></td><td>integer ≥ 0</td><td>Bytes sent, for transfers</td></tr>
+    <tr><td><code>message</code></td><td>string ≤ 4000</td><td>Human-readable summary</td></tr>
+    <tr><td><code>raw</code></td><td>JSON object</td><td>Original vendor fields, kept for investigation</td></tr>
+  </table>
+  <p style="color:var(--muted); font-size:9pt; margin-top:6mm">More detail in the repository: docs/connectors-fortigate.md, docs/connectors-microsoft.md, docs/api.md and docs/detection-coverage.md.</p>
+</section>
+
+</body>
+</html>

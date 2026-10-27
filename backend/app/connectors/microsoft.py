@@ -345,6 +345,8 @@ def windows_event(record: Record) -> dict[str, Any] | None:
         return {**base, "event_type": "iam.user_created", "user_name": _account(r, "SubjectUserName"), "target_user": _s(r.get("TargetUserName"), 255)}
     if event_id in (4728, 4732, 4756):
         member = _cn(r.get("MemberName")) or _s(r.get("MemberSid"))
+        if member and "\\" in member:  # "HOST\name" from a resolved SID -> "name", as in event 4720
+            member = member.rsplit("\\", 1)[1]
         return {
             **base,
             "event_type": "iam.group_member_added",

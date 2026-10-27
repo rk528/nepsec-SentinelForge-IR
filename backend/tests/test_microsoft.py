@@ -185,3 +185,18 @@ def test_garbage_records_are_skipped(api_for) -> None:
     key = create_source(admin, "Entra ID")
     body = _post(admin, key, "defender-alert", ["text", 5, {"title": None}, {"no": "fields"}]).json()
     assert body["received"] == 0 and body["skipped"] == 2
+
+
+def test_local_admin_group_add_matches_created_account(api_for) -> None:
+    """The manual's test: net user sf-test /add; net localgroup Administrators sf-test /add."""
+    admin = api_for("admin")
+    key = create_source(admin, "SRV01 Security log")
+    records = [
+        {"EventID": 4720, "TimeCreated": _at(1), "Computer": "SRV01", "LogName": "Security", "EventData": {"TargetUserName": "sf-test", "SubjectUserName": "it.admin"}},
+        # Local group: MemberName resolved by the shipper from MemberSid to "SRV01\sf-test".
+        {"EventID": 4732, "TimeCreated": _at(2), "Computer": "SRV01", "LogName": "Security",
+         "EventData": {"TargetUserName": "Administrators", "MemberName": r"SRV01\sf-test", "MemberSid": "S-1-5-21-1-2-3-1001", "SubjectUserName": "it.admin"}},
+    ]  # fmt: skip
+    body = _post(admin, key, "windows-event", records)
+    assert body.status_code == 200 and body.json()["alerts_created"] == 1
+    assert any(a["rule_id"] == "SF-IAM-001" for a in _alerts(admin))

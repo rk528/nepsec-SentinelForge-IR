@@ -11,7 +11,7 @@ PostgreSQL 16 with [pgserver](https://pypi.org/project/pgserver/); CI uses a `po
 service container. Migrations are applied with Alembic at session start, so the migration
 itself is tested.
 
-**Result: 114 passed.**
+**Result: 115 passed.**
 
 | File | Covers |
 |---|---|
