@@ -1,0 +1,14 @@
+title = "SentinelForge IR secret scanning"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Documented placeholders and CI-only throwaway database credentials"
+regexes = [
+  '''postgres(ql)?://postgres:postgres@localhost''',
+  '''postgresql://USER:PASSWORD@HOST''',
+]
+paths = [
+  '''frontend/package-lock\.json''',
+]

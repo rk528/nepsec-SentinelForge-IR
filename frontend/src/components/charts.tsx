@@ -49,8 +49,8 @@ export function SeverityTrendChart({ data, label, emptyText }: { data: Row[]; la
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 4, right: 4, left: -18, bottom: 0 }} barCategoryGap="22%">
             <CartesianGrid vertical={false} stroke="#232836" />
-            <XAxis dataKey="date" tickFormatter={formatDay} tick={{ fill: "#7a8197", fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={16} />
-            <YAxis allowDecimals={false} tick={{ fill: "#7a8197", fontSize: 11 }} axisLine={false} tickLine={false} width={40} />
+            <XAxis dataKey="date" tickFormatter={formatDay} tick={{ fill: "#858ca2", fontSize: 11 }} axisLine={false} tickLine={false} minTickGap={16} />
+            <YAxis allowDecimals={false} tick={{ fill: "#858ca2", fontSize: 11 }} axisLine={false} tickLine={false} width={40} />
             <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(255,255,255,0.04)" }} />
             <Legend iconType="square" iconSize={8} wrapperStyle={{ fontSize: 11, color: "#a0a7b8", paddingTop: 8 }} />
             {present.map((s, i) => (

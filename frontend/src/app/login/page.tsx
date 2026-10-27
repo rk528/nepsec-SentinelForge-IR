@@ -11,6 +11,7 @@ import { z } from "zod";
 import { LogoMark } from "@/components/shell/logo";
 import { Button, Field, Input } from "@/components/ui/primitives";
 import { ApiError, api } from "@/lib/api";
+import { safeNext } from "@/lib/navigation";
 import type { Me } from "@/lib/types";
 
 const schema = z.object({
@@ -18,12 +19,6 @@ const schema = z.object({
   password: z.string().min(1, "Enter your password").max(256),
 });
 type FormValues = z.infer<typeof schema>;
-
-function safeNext(next: string | null): string {
-  // Only allow same-site relative paths to prevent open redirects.
-  if (!next || !next.startsWith("/") || next.startsWith("//") || next.startsWith("/\\")) return "/dashboard";
-  return next;
-}
 
 function LoginForm() {
   const router = useRouter();
