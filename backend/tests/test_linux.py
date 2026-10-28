@@ -294,3 +294,21 @@ def test_full_capture_lines_skip_detection_and_expire(api_for, db) -> None:
     db.expire_all()
     messages = [m for (m,) in db.execute(select(Event.message).where(Event.event_type == "system.log")).all()]
     assert messages == ["fresh"]
+
+
+def test_activity_view_lists_users_with_their_activity(api_for) -> None:
+    admin = api_for("admin")
+    key = create_source(admin, "ubuntu-desk-07 journal")
+    exec_ = {"exe": "/usr/bin/ls", "argv": ["ls", "-la"], "user": "maya", "run_as": "maya", "tty": "pts1", "cwd": "/home/maya", "pid": "1", "ppid": "1", "success": "yes"}
+    records = [
+        jr(1, "gdm-password]", "pam_unix(gdm-password:session): session opened for user maya(uid=1000) by (uid=0)", host="ubuntu-desk-07"),
+        jr(2, "sf-audit-exec", "ls -la", host="ubuntu-desk-07", SF_EXEC=exec_),
+        jr(3, "sf-audit-exec", "ls -la Documents", host="ubuntu-desk-07", SF_EXEC={**exec_, "argv": ["ls", "-la", "Documents"]}),
+        jr(4, "kernel", "usb 1-1: New USB device found, idVendor=0781, idProduct=5567", host="ubuntu-desk-07"),
+        jr(5, "sshd", "Failed password for root from 203.0.113.9 port 2 ssh2", host="ubuntu-desk-07"),
+    ]
+    assert admin.client.post("/api/v1/ingest/linux", json={"records": records, "capture": "all"}, headers={"Authorization": f"Bearer {key}"}).status_code == 200
+    users = {u["user"]: u for u in admin.get("/api/v1/events/users", params={"hours": 24}).json()}
+    assert users["maya"]["commands"] == 2 and users["maya"]["sign_ins"] == 1 and users["maya"]["hosts"] == ["ubuntu-desk-07"]
+    assert users["root"]["failures"] == 1
+    assert [u["user"] for u in admin.get("/api/v1/events/users", params={"q": "may"}).json()] == ["maya"]

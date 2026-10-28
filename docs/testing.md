@@ -11,7 +11,7 @@ PostgreSQL 16 with [pgserver](https://pypi.org/project/pgserver/); CI uses a `po
 service container. Migrations are applied with Alembic at session start, so the migration
 itself is tested.
 
-**Result: 153 passed.**
+**Result: 154 passed.**
 
 | File | Covers |
 |---|---|
@@ -19,7 +19,7 @@ itself is tested.
 | `test_workflow.py` | Ingest → detect → alert → escalate → notes → transitions → close → timeline → report → audit; idempotent re-ingest; detection re-runs; reopen rules |
 | `test_security.py` | Auth required; generic login errors; password not echoed; login rate limit; CSRF; logout revocation; idle expiry; cookie flags; viewer/admin restrictions; ingest key; cross-tenant reads and writes (IDOR); assignee scoping; malicious payloads; Markdown escaping; validation; body size; append-only audit |
 | `test_response.py` | All playbooks; idempotency; separation of duties; internal IP refusal; closure blocked by pending actions; demo seed, login, restrictions, reset; first demo sign-in seeds; dashboard metrics without data; ATT&CK coverage states |
-| `test_linux.py` | Ubuntu journal mapping (SSH, GDM/console/su/sudo PAM, sudo commands and denials, useradd/usermod/gpasswd, service stops incl. byte-array messages and old systemd); SSH brute force, new sudo user with actor, logging stopped end to end; reboot stops ignored; shipper filtering, cursor only advanced after delivery, payload round trip; full capture: auditd execve records assembled into one command each (hex-encoded arguments, PROCTITLE fallback), USB and session-end mapping, unmapped lines kept as `system.log`, skipped by detection and deleted after the retention period |
+| `test_linux.py` | Ubuntu journal mapping (SSH, GDM/console/su/sudo PAM, sudo commands and denials, useradd/usermod/gpasswd, service stops incl. byte-array messages and old systemd); SSH brute force, new sudo user with actor, logging stopped end to end; reboot stops ignored; shipper filtering, cursor only advanced after delivery, payload round trip; full capture: auditd execve records assembled into one command each (hex-encoded arguments, PROCTITLE fallback), USB and session-end mapping, unmapped lines kept as `system.log`, skipped by detection and deleted after the retention period; the per-user activity summary |
 | `test_custom_playbooks.py` | Building playbooks (lead only, unknown actions and rules refused), rule-based suggestions, automated steps through the built-in service, manual tasks with notes as evidence, gated steps completing after a second lead approves, skip reasons, reopening, archiving, tenant isolation |
 | `test_onboarding.py` | Welcome email content (temporary password, one-time link, role and system details, HTML escaping); forced password change blocks the API; links are single-use, expire, and are retired by a newer link or a password change; admin-only and org-scoped resets; fallback when email is not configured; Resend request and error handling |
 | `test_microsoft.py` | Entra ID sign-in and audit, Defender alert and Windows event mapping (Graph, Azure Monitor, Log Analytics and PowerShell shapes); MFA interrupts and machine logons skipped; Sysmon 10/13, task creation (4698, incl. escaped Log Analytics XML) and RDP logon types; alerts raised end to end; re-forwarded alerts de-duplicated; batch limits; ingest key required; `-CaptureAll` events kept as `system.log` |

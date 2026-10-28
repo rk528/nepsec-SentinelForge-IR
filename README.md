@@ -78,7 +78,7 @@ extensions are skipped automatically on Windows for the same reason.
 ## Tests
 
 ```bash
-cd backend  && python -m pytest                    # 153 tests against real PostgreSQL
+cd backend  && python -m pytest                    # 154 tests against real PostgreSQL
 cd frontend && npm run lint && npm run typecheck && npm test   # 23 unit/component tests
 cd frontend && npm run test:e2e                    # 10 Playwright tests incl. axe WCAG scans
 ```

@@ -12,6 +12,7 @@ import {
   Settings,
   ShieldAlert,
   Siren,
+  UserSearch,
   Workflow,
 } from "lucide-react";
 
@@ -36,6 +37,7 @@ export const NAV: { section: string; items: NavItem[] }[] = [
     section: "Investigate",
     items: [
       { href: "/investigations", label: "My investigations", icon: ListChecks, keywords: "assigned work" },
+      { href: "/activity", label: "User activity", icon: UserSearch, keywords: "what did user do commands timeline sessions usb" },
       { href: "/threat-intel", label: "Threat intel", icon: Search, keywords: "ioc indicator lookup virustotal abuseipdb otx nepsec" },
     ],
   },

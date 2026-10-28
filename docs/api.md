@@ -50,6 +50,7 @@ A user signed in with an emailed temporary password (`must_change_password: true
 | PATCH | `/alerts/{id}` | analyst | Status, disposition (+reason), assignee |
 | POST | `/alerts/{id}/escalate` | analyst | New incident, or `{incident_id}` to link |
 | GET | `/events`, `/events/{id}`, `/events/{id}/related` | viewer | `raw` is returned to analyst+ only |
+| GET | `/events/users?hours=&q=` | viewer | Accounts seen in the window with counts of commands, sign-ins, failures, account changes and devices, plus their hosts; drives the User activity page |
 | GET | `/detections` | viewer | Rules with latest self-test results |
 | POST | `/detections/run`, `/detections/self-test` | analyst | |
 | PATCH | `/detections/{rule_id}` | admin (non-demo) | Enable/disable |

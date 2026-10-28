@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 import { cn } from "./primitives";
 
-export function SearchBox({ value, onChange, placeholder, label, delay = 300 }: { value: string; onChange: (v: string) => void; placeholder: string; label: string; delay?: number }) {
+export function SearchBox({ value, onChange, placeholder, label, delay = 300, className }: { value: string; onChange: (v: string) => void; placeholder: string; label: string; delay?: number; className?: string }) {
   const [draft, setDraft] = useState(value);
   // Resync when the URL value changes from outside (e.g. "Clear filters").
   const [synced, setSynced] = useState(value);
@@ -19,7 +19,7 @@ export function SearchBox({ value, onChange, placeholder, label, delay = 300 }: 
     return () => clearTimeout(t);
   }, [draft, value, onChange, delay]);
   return (
-    <div className="relative w-full sm:w-80">
+    <div className={cn("relative w-full sm:w-80", className)}>
       <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-subtle" aria-hidden />
       <input
         type="search"

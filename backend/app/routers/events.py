@@ -79,6 +79,54 @@ def search_events(
     return Page(items=_serialise(principal, [(e, n) for e, n in rows]), total=total, page=page, page_size=page_size)
 
 
+@router.get("/users")
+def active_users(
+    principal: Principal = Viewer,
+    db: Session = Depends(get_db),
+    hours: int = Query(24, ge=1, le=24 * 90),
+    q: str | None = Query(None, max_length=100),
+    limit: int = Query(100, ge=1, le=500),
+) -> list[dict[str, Any]]:
+    """Accounts seen in events over the window, with what kind of activity each had (for the activity view)."""
+    since = datetime.now(UTC) - timedelta(hours=hours)
+
+    def kind(*types: str) -> Any:
+        return func.count().filter(Event.event_type.in_(types))
+
+    stmt = (
+        select(
+            Event.user_name,
+            func.count().label("events"),
+            kind("process.start").label("commands"),
+            kind("auth.success").label("sign_ins"),
+            kind("auth.failure").label("failures"),
+            kind("iam.user_created", "iam.group_member_added").label("account_changes"),
+            kind("device.connected").label("devices"),
+            func.max(Event.event_time).label("last_seen"),
+            func.array_agg(func.distinct(Event.host)).label("hosts"),
+        )
+        .where(Event.org_id == principal.org_id, Event.event_time >= since, Event.user_name.is_not(None))
+        .group_by(Event.user_name)
+    )
+    if q:
+        stmt = stmt.where(Event.user_name.ilike(f"%{q.strip()}%"))
+    rows = db.execute(stmt.order_by(func.max(Event.event_time).desc()).limit(limit)).all()
+    return [
+        {
+            "user": r.user_name,
+            "events": r.events,
+            "commands": r.commands,
+            "sign_ins": r.sign_ins,
+            "failures": r.failures,
+            "account_changes": r.account_changes,
+            "devices": r.devices,
+            "last_seen": r.last_seen.isoformat(),
+            "hosts": sorted(h for h in r.hosts if h),
+        }
+        for r in rows
+    ]
+
+
 @router.get("/{event_id}")
 def get_event(event_id: uuid.UUID, principal: Principal = Viewer, db: Session = Depends(get_db)) -> dict[str, Any]:
     row = db.execute(select(Event, DataSource).join(DataSource, DataSource.id == Event.data_source_id).where(Event.id == event_id, Event.org_id == principal.org_id)).one_or_none()
