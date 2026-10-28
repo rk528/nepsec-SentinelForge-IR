@@ -6,14 +6,14 @@ import hashlib
 import json
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import func, select, update
+from sqlalchemy import delete, exists, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
-from app.models import Asset, DataSource, Event
+from app.models import AlertEvent, Asset, DataSource, Event, IncidentEvent
 from app.schemas import EventIn
 
 
@@ -77,6 +77,23 @@ def ingest_events(
         )
     )
     return IngestResult(len(events), len(inserted_ids), inserted_ids, min(e.event_time for e in events))
+
+
+def purge_expired_logs(db: Session, org_id: uuid.UUID, days: int, limit: int = 5000) -> int:
+    """Delete one bounded slice of expired ``system.log`` lines; called on every ingest so no cron is needed."""
+    cutoff = datetime.now(UTC) - timedelta(days=max(days, 1))
+    expired = (
+        select(Event.id)
+        .where(
+            Event.org_id == org_id,
+            Event.event_type == "system.log",
+            Event.event_time < cutoff,
+            ~exists().where(IncidentEvent.event_id == Event.id),
+            ~exists().where(AlertEvent.event_id == Event.id),
+        )
+        .limit(limit)
+    )
+    return db.execute(delete(Event).where(Event.id.in_(expired.scalar_subquery()))).rowcount or 0
 
 
 def _ensure_assets(db: Session, org_id: uuid.UUID, hosts: set[str], events: list[EventIn]) -> dict[str, uuid.UUID]:

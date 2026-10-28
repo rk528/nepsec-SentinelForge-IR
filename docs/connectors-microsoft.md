@@ -86,6 +86,17 @@ creation (4698) needs *Object Access > Audit Other Object Access Events*. Sysmon
 must be enabled in your Sysmon configuration (for example, rules for `TargetImage` ending in
 `lsass.exe` and `TargetObject` containing `CurrentVersion\Run`).
 
+**Full capture.** Add `-CaptureAll` to send every event in the Security, System, Application,
+PowerShell/Operational and (when installed) Sysmon logs, with the rendered message; the
+Sysmon and network-logon filters above are switched off. Events the detections use are
+mapped as usual; the rest are stored as `system.log` and deleted after `LOG_RETENTION_DAYS`.
+With 4688 command-line auditing on, every program started is recorded. Batches drop to 80
+records, and a rate-limited batch is retried rather than lost.
+
+```powershell
+.\Send-WindowsEvents.ps1 -ApiUrl https://sentinelforge-api.kuinkel.com -CaptureAll
+```
+
 The shipper's own scheduled task runs PowerShell, so SF-PERS-001 raises one alert per host
 when you register it. Close it as benign positive (runbook RB-8).
 

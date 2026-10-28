@@ -19,6 +19,9 @@ from app.detection.fixtures import CASES
 from app.detection.rules import ALL_RULES, MAX_LOOKBACK_MINUTES, RULES_BY_ID, Rule
 from app.models import Alert, AlertEvent, DetectionRule, DetectionTestRun, Event, Indicator
 
+# Full-capture log lines no rule reads; loading them would only slow every run down.
+PASSIVE_EVENT_TYPES = ("system.log",)
+
 
 def to_view(e: Event) -> EventView:
     return EventView(
@@ -96,7 +99,15 @@ def run_detection(
     enabled = {r for (r,) in db.execute(select(DetectionRule.id).where(DetectionRule.enabled.is_(True))).all()}
 
     window_start = since - timedelta(minutes=MAX_LOOKBACK_MINUTES)
-    rows = db.execute(select(Event).where(Event.org_id == org_id, Event.event_time >= window_start, Event.event_time <= until).order_by(Event.event_time)).scalars().all()
+    rows = (
+        db.execute(
+            select(Event)
+            .where(Event.org_id == org_id, Event.event_time >= window_start, Event.event_time <= until, Event.event_type.not_in(PASSIVE_EVENT_TYPES))
+            .order_by(Event.event_time)
+        )
+        .scalars()
+        .all()
+    )
     views = [to_view(e) for e in rows]
     det_ctx = _detection_context(db, org_id)
 

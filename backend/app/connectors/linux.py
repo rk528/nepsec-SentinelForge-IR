@@ -12,7 +12,14 @@ Mapped messages, by SYSLOG_IDENTIFIER:
 * ``systemd``: security and logging services stopping (auditd, rsyslog, journald, ...),
   except during a shutdown or reboot of the same boot.
 
-Anything else is counted as skipped, never guessed at.
+* ``kernel``: ``New USB device found`` as a device connection.
+* PAM ``session closed`` for interactive, ``su`` and SSH sessions as a session end.
+* ``sf-audit-exec``: one auditd execve event per program a signed-in user started,
+  assembled by the shipper in full-capture mode (``--capture all``).
+
+Anything else is counted as skipped, never guessed at, unless the batch was sent in
+full-capture mode: then it is stored verbatim as ``system.log`` (kept for
+``LOG_RETENTION_DAYS``, never evaluated by detections).
 """
 
 from __future__ import annotations
@@ -56,6 +63,8 @@ ACCOUNT_TOOLS = re.compile(r"(^|/)(useradd|adduser|usermod|gpasswd|groupmod|delu
 _SSH_ACCEPTED = re.compile(r"^Accepted (\S+) for (\S+) from (\S+) port \d+")
 _SSH_FAILED = re.compile(r"^Failed (\S+) for (?:invalid user )?(\S+) from (\S+) port \d+")
 _PAM_AUTH_FAIL = re.compile(r"pam_unix\(([\w.-]+):auth\): authentication failure;(.*)$")
+_PAM_CLOSED = re.compile(r"pam_unix\(([\w.-]+):session\): session closed for user ([^\s(]+)")
+_USB = re.compile(r"^usb ([\w.:-]+): New USB device found, idVendor=(\w+), idProduct=(\w+)")
 _PAM_SESSION = re.compile(r"pam_unix\(([\w.-]+):session\): session opened for user ([^\s(]+)(?:\(uid=\d+\))?(?: by ([^\s(]*))?")
 _KV = re.compile(r"(\w+)=(\S*)")
 _SUDO = re.compile(r"^\s*(\S+) : (.*)$")
@@ -154,6 +163,8 @@ def map_record(r: Record, *, actor: str | None = None) -> list[dict[str, Any]]:
                     "raw": {**base["raw"], "method": m.group(1), "logon": "ssh"},
                 }
             ]
+        if m := _PAM_CLOSED.search(message):
+            return [{**base, "event_type": "session.ended", "user_name": _user(m.group(2)), "raw": {**base["raw"], "pam_service": m.group(1), "logon": "ssh"}}]
         return []  # PAM lines from sshd duplicate the two above
 
     if ident in PAM_AUTH and (m := _PAM_AUTH_FAIL.search(message)):
@@ -185,6 +196,16 @@ def map_record(r: Record, *, actor: str | None = None) -> list[dict[str, Any]]:
                 }
             ]
         return []
+    if ident in PAM_AUTH and (m := _PAM_CLOSED.search(message)):
+        service = m.group(1)
+        if service in INTERACTIVE_LOGIN or service == "su":
+            return [{**base, "event_type": "session.ended", "user_name": _user(m.group(2)), "raw": {**base["raw"], "pam_service": service}}]
+        return []
+
+    if ident == "sf-audit-exec" and isinstance(r.get("SF_EXEC"), dict):
+        return [_audit_exec(base, r["SF_EXEC"], message)]
+    if ident == "kernel" and (m := _USB.match(message)):
+        return [{**base, "event_type": "device.connected", "raw": {**base["raw"], "bus": "usb", "port": m.group(1), "vendor_id": m.group(2), "product_id": m.group(3)}}]
 
     if ident == "sudo" and (m := _SUDO.match(message)):
         user = _user(m.group(1))
@@ -236,6 +257,54 @@ def map_record(r: Record, *, actor: str | None = None) -> list[dict[str, Any]]:
     return []
 
 
+def _audit_exec(base: dict[str, Any], x: dict[str, Any], message: str) -> dict[str, Any]:
+    argv = [str(a) for a in x.get("argv") or [] if a is not None][:256]
+    exe = str(x.get("exe") or "")[:1024]
+    user = _user(str(x.get("user") or ""))
+    run_as = _user(str(x.get("run_as") or ""))
+    return {
+        **base,
+        "event_type": "process.start",
+        "outcome": "success" if str(x.get("success") or "yes") == "yes" else "failure",
+        "user_name": user,
+        "target_user": run_as if run_as and run_as != user else None,
+        "process_name": posixpath.basename(exe)[:255] or (posixpath.basename(argv[0])[:255] if argv else None),
+        "command_line": (" ".join(argv) or message)[:8192],
+        "parent_process": _user(str(x.get("parent") or "")),
+        "message": None,
+        "raw": {
+            **base["raw"],
+            "source": "linux.auditd",
+            "exe": exe or None,
+            "cwd": str(x.get("cwd") or "")[:1024] or None,
+            "tty": str(x.get("tty") or "")[:32] or None,
+            "pid": x.get("pid"),
+            "ppid": x.get("ppid"),
+        },
+    }
+
+
+def _system_log(r: Record) -> dict[str, Any] | None:
+    """A full-capture journal line that no mapping above describes, stored as it is."""
+    when, message = _time(r), _message(r)
+    if when is None or not message:
+        return None
+    ident = _identifier(r)
+    raw: dict[str, Any] = {"source": "linux.journald", "identifier": ident or None}
+    for key, name in (("PRIORITY", "priority"), ("_SYSTEMD_UNIT", "unit"), ("_PID", "pid"), ("_TRANSPORT", "transport")):
+        if r.get(key) not in (None, ""):
+            raw[name] = str(r[key])[:255]
+    return {
+        "event_time": when,
+        "event_type": "system.log",
+        "host": str(r.get("_HOSTNAME") or "").strip().lower()[:255] or None,
+        "user_name": _user(str(r.get("SF_USER") or "")),
+        "process_name": ident[:255] or None,
+        "message": message[:4000],
+        "raw": raw,
+    }
+
+
 def _records(payload: Any) -> list[Record]:
     if isinstance(payload, dict):
         items = payload.get("records") if isinstance(payload.get("records"), list) else [payload]
@@ -253,6 +322,7 @@ def _shutdown_boots(records: Iterable[Record]) -> set[str]:
 def map_linux_payload(payload: Any) -> tuple[list[EventIn], int]:
     """Journal records from a shipper batch -> events, plus the number of records skipped."""
     records = _records(payload)
+    capture_all = isinstance(payload, dict) and payload.get("capture") == "all"
     # Every service stops when the machine shuts down; those stops are not tampering.
     stopping = _shutdown_boots(records)
     # Last sudo user per host who ran an account tool, to name the actor of useradd/usermod.
@@ -270,6 +340,8 @@ def map_linux_payload(payload: Any) -> tuple[list[EventIn], int]:
         except (AttributeError, KeyError, TypeError, ValueError):
             mapped = []
         mapped = [m for m in mapped if not (m["event_type"] == "service.stopped" and m["raw"].get("boot_id") in stopping)]
+        if not mapped and capture_all and (line := _system_log(r)):
+            mapped = [line]
         if not mapped:
             skipped += 1
             continue

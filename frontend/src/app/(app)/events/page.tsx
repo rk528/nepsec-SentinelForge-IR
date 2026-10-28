@@ -7,13 +7,23 @@ import { EventDialog } from "@/components/investigation";
 import { SyntheticBadge } from "@/components/ui/badges";
 import { DataTable, Pagination, type Column } from "@/components/ui/data-table";
 import { SearchBox, Toolbar } from "@/components/ui/filters";
-import { Button, EmptyState, ErrorState, Input, PageHeader, Panel, Segmented, Select, SkeletonRows } from "@/components/ui/primitives";
+import { Button, EmptyState, ErrorState, Input, PageHeader, Panel, Segmented, Select, SkeletonRows, cn } from "@/components/ui/primitives";
 import { api } from "@/lib/api";
 import { formatDateTime, utcTitle } from "@/lib/format";
 import { useUrlState } from "@/lib/hooks";
 import type { DataSource, EventRecord, Page } from "@/lib/types";
 
-const EVENT_TYPES = ["auth.success", "auth.failure", "process.start", "iam.user_created", "iam.group_member_added", "log.cleared", "service.stopped", "network.connection", "dns.query", "proxy.request", "email.delivered", "file.created", "security.alert", "process.access", "registry.set", "task.created"];
+const EVENT_TYPES = ["auth.success", "auth.failure", "process.start", "iam.user_created", "iam.group_member_added", "log.cleared", "service.stopped", "network.connection", "dns.query", "proxy.request", "email.delivered", "file.created", "security.alert", "process.access", "registry.set", "task.created", "session.ended", "device.connected", "system.log"];
+
+// Colour by family so sign-ins, commands and account changes stand out from routine log lines.
+function typeTone(t: string) {
+  if (t === "auth.failure" || t === "log.cleared" || t === "service.stopped" || t === "security.alert") return "bg-danger/10 text-danger";
+  if (t === "auth.success" || t === "session.ended") return "bg-ok/10 text-ok";
+  if (t.startsWith("iam.") || t === "task.created" || t === "registry.set" || t === "process.access" || t === "device.connected") return "bg-warn/10 text-warn";
+  if (t === "process.start") return "bg-accent/10 text-accent";
+  if (t === "system.log") return "text-subtle";
+  return "bg-raised text-muted";
+}
 
 const RANGES = [
   { value: "24", label: "24h" },
@@ -45,7 +55,7 @@ function Events() {
 
   const pivotFilter = (field: "host" | "user" | "ip" | "domain", value: string | null) =>
     value ? (
-      <button type="button" onClick={() => url.set({ [field]: value })} className="mono text-xs text-fg hover:text-accent hover:underline" title={`Filter by ${field} ${value}`}>
+      <button type="button" onClick={() => url.set({ [field]: value })} className="mono block max-w-56 truncate text-left text-xs whitespace-nowrap text-fg hover:text-accent hover:underline" title={`Filter by ${field} ${value}`}>
         {value}
       </button>
     ) : (
@@ -63,13 +73,22 @@ function Events() {
       ),
       className: "w-44",
     },
-    { key: "type", header: "Type", render: (e) => <span className="mono text-xs text-muted">{e.event_type}</span> },
+    { key: "type", header: "Type", render: (e) => <span className={cn("mono inline-block rounded px-1.5 py-0.5 text-xs whitespace-nowrap", typeTone(e.event_type))}>{e.event_type}</span> },
     { key: "host", header: "Host", render: (e) => pivotFilter("host", e.host) },
     { key: "user", header: "User", hideBelow: "md", render: (e) => pivotFilter("user", e.user_name) },
     { key: "src", header: "Source IP", hideBelow: "lg", render: (e) => pivotFilter("ip", e.src_ip) },
     { key: "dst", header: "Destination", hideBelow: "lg", render: (e) => (e.domain ? pivotFilter("domain", e.domain) : pivotFilter("ip", e.dst_ip)) },
-    { key: "detail", header: "Detail", hideBelow: "md", render: (e) => <span className="mono block max-w-xs truncate text-xs text-subtle">{e.command_line ?? e.process_name ?? e.email_subject ?? e.message ?? ""}</span> },
-    { key: "src_name", header: "Source", hideBelow: "lg", render: (e) => <span className="flex items-center gap-1.5 text-xs text-muted"><span className="max-w-40 truncate">{e.data_source_name}</span>{e.is_synthetic && <SyntheticBadge />}</span> },
+    {
+      key: "detail",
+      header: "Detail",
+      hideBelow: "md",
+      className: "w-full max-w-0",
+      render: (e) => {
+        const detail = e.command_line ?? e.message ?? e.process_name ?? e.email_subject ?? "";
+        return <span className="mono block truncate text-xs text-subtle" title={detail}>{detail}</span>;
+      },
+    },
+    { key: "src_name", header: "Source", hideBelow: "lg", render: (e) => <span className="flex items-center gap-1.5 text-xs whitespace-nowrap text-muted"><span className="max-w-36 truncate" title={e.data_source_name ?? undefined}>{e.data_source_name}</span>{e.is_synthetic && <SyntheticBadge />}</span> },
   ];
   const filtered = !!(q || type || host || user || ip || domain || source || hours);
 

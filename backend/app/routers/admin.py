@@ -18,13 +18,13 @@ from app.connectors.linux import map_linux_payload
 from app.connectors.microsoft import map_records
 from app.db import get_db
 from app.deps import Admin, Analyst, Lead, Principal, Viewer, get_ctx, request_context, require_non_demo
-from app.detection.engine import run_detection
+from app.detection.engine import PASSIVE_EVENT_TYPES, run_detection
 from app.intel.providers import PROVIDERS
 from app.models import AuditLog, DataSource, Event, Organization, User
 from app.schemas import AuditOut, DataSourceCreateIn, EventIn, IngestIn, IngestOut, Page, UserCreateIn, UserRef, UserUpdateIn
 from app.security import hash_password, new_token, sha256_hex
 from app.services import demo, mail, onboarding
-from app.services.ingest import ingest_events
+from app.services.ingest import ingest_events, purge_expired_logs
 from app.services.scenarios import SCENARIOS, scenario_metadata
 
 router = APIRouter(tags=["administration"])
@@ -396,9 +396,13 @@ def _ingest(request: Request, db: Session, src: DataSource, events: list[EventIn
     result = ingest_events(db, src.org_id, src, events)
     ctx = RequestContext(org_id=src.org_id, user_id=None, actor_label=f"ingest:{src.name}", ip=request_context(request).ip, request_id=getattr(request.state, "request_id", None))
     created = updated = 0
-    if run and result.inserted and result.earliest:
-        summary = run_detection(db, src.org_id, since=result.earliest, ctx=ctx)
+    detectable = [e.event_time for e in events if e.event_type not in PASSIVE_EVENT_TYPES]
+    if run and result.inserted and detectable:
+        summary = run_detection(db, src.org_id, since=min(detectable), ctx=ctx)
         created, updated = summary.alerts_created, summary.alerts_updated
+    purged = purge_expired_logs(db, src.org_id, get_settings().log_retention_days) if len(detectable) < len(events) else 0
+    if purged:
+        details = {**(details or {}), "expired_log_lines_deleted": purged}
     audit.record(db, ctx, "ingest.batch", target_type="data_source", target_id=src.id, details={"received": result.received, "inserted": result.inserted, **(details or {})})
     db.commit()
     return IngestOut(received=result.received, inserted=result.inserted, duplicates=result.received - result.inserted, alerts_created=created, alerts_updated=updated)

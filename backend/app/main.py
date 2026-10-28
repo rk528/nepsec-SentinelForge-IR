@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.config import get_settings
-from app.routers import admin, alerts, auth, dashboard, detections, events, health, incidents, iocs, response
+from app.routers import admin, alerts, auth, custom_playbooks, dashboard, detections, events, health, incidents, iocs, response
 
 log = logging.getLogger("sentinelforge")
 
@@ -124,7 +124,7 @@ def create_app() -> FastAPI:
         log.exception("unhandled error request_id=%s path=%s", rid, request.url.path)
         return JSONResponse(status_code=500, content={"detail": "Internal server error", "request_id": rid})
 
-    for r in (health, auth, dashboard, incidents, alerts, events, detections, iocs, response, admin):
+    for r in (health, auth, dashboard, incidents, alerts, events, detections, iocs, response, custom_playbooks, admin):
         app.include_router(r.router, prefix=API_PREFIX)
 
     @app.get("/", include_in_schema=False)

@@ -218,6 +218,46 @@ export interface Playbook {
   rollback_plan: string | null;
 }
 
+export interface PlaybookStep {
+  kind: "action" | "task";
+  title: string;
+  action: string | null;
+  instructions: string | null;
+}
+
+export interface CustomPlaybook {
+  id: string;
+  name: string;
+  description: string;
+  steps: PlaybookStep[];
+  trigger_rules: string[];
+  created_by: string | null;
+  updated_at: string;
+  suggested: boolean;
+}
+
+export type RunStepStatus = "pending" | "done" | "skipped" | "awaiting_approval" | "failed";
+
+export interface RunStep extends PlaybookStep {
+  status: RunStepStatus;
+  note: string | null;
+  by: string | null;
+  at: string | null;
+  playbook_run_id: string | null;
+}
+
+export interface CustomPlaybookRun {
+  id: string;
+  playbook_id: string;
+  incident_id: string;
+  name: string;
+  status: "in_progress" | "completed";
+  started_by: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  steps: RunStep[];
+}
+
 export interface Indicator {
   id: string;
   ioc_type: string;

@@ -50,6 +50,7 @@ variable settings and a local, git-ignored `backend/.env`.
 | `MAIL_FROM` | sender, e.g. `SentinelForge IR <no-reply@kuinkel.com>`; the domain must be verified in Resend | Plain |
 | `APP_BASE_URL` | public frontend URL used in email links, e.g. `https://sentinelforge.kuinkel.com` | Plain |
 | `MAIL_REPLY_TO` | optional: a mailbox you read, used as Reply-To on onboarding and reset emails | Plain |
+| `LOG_RETENTION_DAYS` | optional, default `3`: days to keep full-capture `system.log` lines before they are deleted | Plain |
 
 4. Deploy, then check `https://<backend-domain>/api/v1/health` returns
    `{"status":"ok","database":"ok",...}`.
@@ -94,6 +95,9 @@ python -m alembic current
 Migration `0003` (password onboarding) adds `users.must_change_password` and the
 `password_reset_tokens` table. Apply it before deploying the release that creates users with
 emailed temporary passwords.
+
+Migration `0004` (custom playbooks) adds the `custom_playbooks` and `custom_playbook_runs`
+tables. It is additive; apply it before deploying the release with the playbook builder.
 
 Migrations are additive in this release. Do not run `alembic downgrade` against production
 without a backup: it drops tables.

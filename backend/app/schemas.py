@@ -35,6 +35,9 @@ EVENT_TYPES = (
     "process.access",
     "registry.set",
     "task.created",
+    "session.ended",
+    "device.connected",
+    "system.log",
 )
 EventType = Literal[
     "auth.success",
@@ -53,6 +56,9 @@ EventType = Literal[
     "process.access",
     "registry.set",
     "task.created",
+    "session.ended",
+    "device.connected",
+    "system.log",
 ]
 
 
@@ -444,6 +450,46 @@ class IndicatorOut(ORM):
 class PlaybookRunIn(BaseModel):
     incident_id: uuid.UUID
     idempotency_key: str = Field(min_length=8, max_length=100, pattern=r"^[A-Za-z0-9_\-:.]+$")
+    parameters: dict[str, Any] = Field(default_factory=dict)
+
+
+class PlaybookStepIn(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    kind: Literal["action", "task"]
+    title: str = Field(min_length=1, max_length=200)
+    # A built-in playbook id; required for kind "action", checked against the registry by the router.
+    action: str | None = Field(default=None, max_length=64)
+    instructions: str | None = Field(default=None, max_length=4000)
+
+
+class CustomPlaybookIn(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    name: str = Field(min_length=1, max_length=200)
+    description: str = Field(default="", max_length=2000)
+    steps: list[PlaybookStepIn] = Field(min_length=1, max_length=30)
+    trigger_rules: list[str] = Field(default_factory=list, max_length=50)
+
+
+class CustomPlaybookPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = Field(default=None, max_length=2000)
+    steps: list[PlaybookStepIn] | None = Field(default=None, min_length=1, max_length=30)
+    trigger_rules: list[str] | None = Field(default=None, max_length=50)
+
+
+class CustomPlaybookStartIn(BaseModel):
+    incident_id: uuid.UUID
+
+
+class CustomStepUpdateIn(BaseModel):
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    action: Literal["complete", "skip", "run", "reopen"]
+    note: str = Field(default="", max_length=4000)
     parameters: dict[str, Any] = Field(default_factory=dict)
 
 

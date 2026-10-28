@@ -62,6 +62,36 @@ The installer asks for the ingest key (the input is hidden). It:
 On a server reached over SSH, run it inside your SSH session. On a desktop, open
 **Terminal** (Ctrl+Alt+T) and run the same commands.
 
+### Full capture: every command and every log line
+
+```bash
+sudo bash install.sh --api-url https://sentinelforge-api.kuinkel.com --capture all
+```
+
+Re-running the installer on a machine that already ships switches it over; the cursor is
+kept, so nothing is re-sent. With `--capture all` the installer also:
+
+- installs `auditd` if needed and adds `/etc/audit/rules.d/90-sentinelforge.rules`, which
+  audits every `execve` by a signed-in user (login uid 1000 or above; services and the
+  shipper itself are excluded);
+- enables `systemd-journald-audit.socket`, so those audit records land in the journal the
+  shipper already reads.
+
+The shipper then sends **every journal line**, plus one `process.start` event per program a
+user starts (command line, working directory, terminal, the user who signed in and the user
+it ran as, for example `raghav` running `cat /etc/shadow` as `root` through sudo). It also
+maps USB devices being plugged in (`device.connected`) and desktop, SSH and `su` sessions
+ending (`session.ended`). Everything else is stored as `system.log`.
+
+`system.log` lines are searchable in Events but are not evaluated by detections, and the API
+deletes them after `LOG_RETENTION_DAYS` (default 3) so they cannot fill the database. Lines
+linked to an alert or incident are kept. Security events are not affected. Expect tens of
+thousands of lines a day from an active desktop: on Neon's free tier (0.5 GB) keep the
+retention short, or ship full capture from a few machines only.
+
+To go back to security events only, re-run the installer without `--capture all`; it removes
+the audit rule again.
+
 ## 3. Check it works
 
 ```bash
@@ -98,13 +128,13 @@ default under `/var/log/journal`).
   or cloud images, `sudo mkdir -p /var/log/journal && sudo systemctl restart systemd-journald`.
 - **SSH:** `PasswordAuthentication no` is safer; failures are still logged for key and
   invalid-user attempts, but SF-AUTH-001 needs password logins to fire.
-- **Command lines beyond sudo:** process execution by non-sudo users is not in the journal.
-  Install `auditd` with an `execve` rule if you need it (see limitations).
+- **Command lines beyond sudo:** use `--capture all`, which sets up the `auditd` rule for you.
 
 ## Limitations
 
-- Only events written to the journal are seen. Plain process execution, file access and
-  network connections need auditd or an EDR, which this connector does not parse yet.
+- Only events written to the journal are seen. Commands are captured with `--capture all`;
+  file access and network connections need further audit rules or an EDR, which this
+  connector does not parse yet. Screen lock and unlock are not logged by GNOME.
 - Local desktop sign-ins carry no source IP, so SF-AUTH-001 (which keys on account and source
   address) only fires for remote logins such as SSH.
 - The actor of `useradd`/`usermod` is taken from a `sudo` command on the same host in the two

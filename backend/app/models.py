@@ -526,6 +526,47 @@ class PlaybookRun(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class CustomPlaybook(Base):
+    """An organisation's own playbook: ordered automated and manual steps."""
+
+    __tablename__ = "custom_playbooks"
+    __table_args__ = (Index("ix_custom_playbooks_org", "org_id"),)
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    org_id: Mapped[uuid.UUID] = _org_fk()
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
+    # [{"kind": "action", "action": "<built-in playbook id>", "title": ...} | {"kind": "task", "title": ..., "instructions": ...}]
+    steps: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False)
+    trigger_rules: Mapped[list[str]] = mapped_column(JSONB, nullable=False, default=list, server_default=text("'[]'::jsonb"))
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = _created_at()
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class CustomPlaybookRun(Base):
+    """One use of a custom playbook on an incident. Steps are a snapshot taken at start, with their progress."""
+
+    __tablename__ = "custom_playbook_runs"
+    __table_args__ = (
+        CheckConstraint("status IN ('in_progress', 'completed')", name="ck_custom_playbook_runs_status"),
+        Index("ix_custom_playbook_runs_incident", "incident_id", "started_at"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    org_id: Mapped[uuid.UUID] = _org_fk()
+    playbook_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("custom_playbooks.id", ondelete="RESTRICT"), nullable=False)
+    incident_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False)
+    started_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    status: Mapped[str] = mapped_column(String(16), nullable=False, default="in_progress")
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    steps: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False)
+    started_at: Mapped[datetime] = _created_at()
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class ResponseAction(Base):
     __tablename__ = "response_actions"
     __table_args__ = (

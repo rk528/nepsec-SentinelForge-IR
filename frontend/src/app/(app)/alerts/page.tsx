@@ -95,9 +95,7 @@ function Alerts() {
       <Panel bodyClassName="p-0">
         <Toolbar>
           <SearchBox label="Search alerts" placeholder="Search title, description or rule" value={q} onChange={(v) => url.set({ q: v })} />
-          <FilterChips label="Status" options={ALERT_STATUS_OPTIONS} selected={status} onChange={(v) => url.set({ status: v })} />
-          <FilterChips label="Severity" options={SEVERITY_OPTIONS} selected={severity} onChange={(v) => url.set({ severity: v })} />
-          <div className="flex items-center gap-2 lg:ml-auto">
+          <div className="flex flex-wrap items-center gap-2">
             <label htmlFor="rule" className="sr-only">
               Detection rule
             </label>
@@ -117,6 +115,11 @@ function Alerts() {
               <option value="false">Not escalated</option>
               <option value="true">Linked to incident</option>
             </Select>
+          </div>
+          {/* Chips on their own row: they never wrap into the dropdowns or leave a ragged gap. */}
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-3 lg:basis-full">
+            <FilterChips label="Status" options={ALERT_STATUS_OPTIONS} selected={status} onChange={(v) => url.set({ status: v })} />
+            <FilterChips label="Severity" options={SEVERITY_OPTIONS} selected={severity} onChange={(v) => url.set({ severity: v })} />
           </div>
         </Toolbar>
         {data.isError ? (

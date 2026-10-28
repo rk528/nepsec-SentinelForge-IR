@@ -178,7 +178,7 @@ def test_shipper_advances_cursor_only_after_delivery(shipper, tmp_path, monkeypa
     monkeypatch.setattr(shipper, "journal", lambda cursor, lookback, journalctl="journalctl": iter(records))
     sent: list[list[dict[str, Any]]] = []
 
-    def ok(url, key, batch, timeout=30.0):
+    def ok(url, key, batch, timeout=30.0, **kw):
         sent.append(list(batch))
         return {"inserted": len(batch), "alerts_created": 0}
 
@@ -188,7 +188,7 @@ def test_shipper_advances_cursor_only_after_delivery(shipper, tmp_path, monkeypa
     assert sent[0][0]["SYSLOG_IDENTIFIER"] == "sshd" and sent[0][0]["_HOSTNAME"] == "ubuntu-srv-01"
     assert shipper.read_cursor(state) == records[-1]["__CURSOR"]
 
-    def fail(url, key, batch, timeout=30.0):
+    def fail(url, key, batch, timeout=30.0, **kw):
         raise RuntimeError("HTTP 503")
 
     previous = shipper.read_cursor(state)
@@ -203,3 +203,94 @@ def test_shipper_payload_round_trips_through_the_mapper(shipper) -> None:
     raw = jr(0, "sshd", "Accepted password for deploy from 203.0.113.50 port 40100 ssh2")
     events, skipped = map_linux_payload({"records": [shipper.slim(raw)]})
     assert skipped == 0 and events[0].user_name == "deploy" and events[0].src_ip == "203.0.113.50"
+
+
+# --- full capture (--capture all) -------------------------------------------------------
+
+
+def _audit(minutes: float, audit_id: str, message: str, type_name: str) -> dict[str, Any]:
+    return jr(minutes, "audit", message, _TRANSPORT="audit", _AUDIT_ID=audit_id, _AUDIT_TYPE_NAME=type_name, host="ubuntu-desk-07")
+
+
+def test_full_capture_assembles_every_user_command(shipper, tmp_path, monkeypatch) -> None:
+    monkeypatch.setattr(shipper, "user_name", lambda value: {"1000": "maya", "0": "root"}.get(str(value)))
+    records = [
+        _audit(
+            1,
+            "1730000000.100:51",
+            'SYSCALL arch=c000003e syscall=59 success=yes exit=0 ppid=2100 pid=2200 auid=1000 uid=0 tty=pts1 comm="cat" exe="/usr/bin/cat" key="sf_exec"',
+            "SYSCALL",
+        ),
+        # Arguments with spaces are hex-encoded by the kernel.
+        _audit(1, "1730000000.100:51", 'EXECVE argc=2 a0="cat" a1=2F746D702F6D792066696C65', "EXECVE"),
+        _audit(1, "1730000000.100:51", 'CWD cwd="/home/maya"', "CWD"),
+        _audit(1, "1730000000.100:51", "PROCTITLE proctitle=636174002F746D702F6D792066696C65", "PROCTITLE"),
+        jr(1.5, "gnome-shell", "Window manager warning: something", host="ubuntu-desk-07", _UID="1000"),
+        # An audit event from another rule is an ordinary log line, not a command.
+        _audit(2, "1730000000.200:52", 'SYSCALL arch=c000003e syscall=2 success=yes auid=1000 uid=1000 comm="vim" exe="/usr/bin/vim" key="watch_etc"', "SYSCALL"),
+        # Our own run log is never shipped back.
+        jr(2.5, "python3", "read 10 journal records", host="ubuntu-desk-07", _SYSTEMD_UNIT="sentinelforge-shipper.service"),
+        # The last command has no EOE or successor; draining at the end still sends it.
+        _audit(
+            3,
+            "1730000000.300:53",
+            'SYSCALL arch=c000003e syscall=59 success=yes ppid=2100 pid=2300 auid=1000 uid=1000 tty=pts1 comm="ls" exe="/usr/bin/ls" key="sf_exec"',
+            "SYSCALL",
+        ),
+        _audit(3, "1730000000.300:53", 'EXECVE argc=2 a0="ls" a1="-la"', "EXECVE"),
+    ]
+    monkeypatch.setattr(shipper, "journal", lambda cursor, lookback, journalctl="journalctl": iter(records))
+    sent: list[dict[str, Any]] = []
+
+    def ok(url, key, batch, timeout=30.0, capture="security"):
+        assert capture == "all"
+        sent.extend(batch)
+        return {"inserted": len(batch), "alerts_created": 0}
+
+    monkeypatch.setattr(shipper, "post", ok)
+    totals = shipper.run("https://api.example.test", "sfk_x", str(tmp_path / "c"), 60, capture="all")
+    assert totals["read"] == len(records) and totals["sent"] == 4
+    events, skipped = map_linux_payload({"records": sent, "capture": "all"})
+    assert skipped == 0
+    cat, gnome, other_audit, ls = events
+    assert (cat.event_type, cat.user_name, cat.target_user, cat.process_name) == ("process.start", "maya", "root", "cat")
+    assert cat.command_line == "cat /tmp/my file" and cat.raw["cwd"] == "/home/maya" and cat.raw["source"] == "linux.auditd"
+    assert gnome.event_type == "system.log" and gnome.user_name == "maya" and gnome.process_name == "gnome-shell"
+    assert other_audit.event_type == "system.log"
+    assert ls.command_line == "ls -la" and ls.target_user is None
+
+
+def test_full_capture_maps_usb_and_session_end_and_keeps_the_rest() -> None:
+    records = [
+        jr(1, "kernel", "usb 1-1: New USB device found, idVendor=0781, idProduct=5567, bcdDevice= 1.00", host="ubuntu-desk-07"),
+        jr(2, "gdm-password]", "pam_unix(gdm-password:session): session closed for user maya", host="ubuntu-desk-07"),
+        jr(3, "NetworkManager", "<info>  [1730000000.1] device (ens33): state change: activated", host="ubuntu-desk-07", PRIORITY="6"),
+    ]
+    events, skipped = map_linux_payload({"records": records, "capture": "all"})
+    usb, closed, nm = events
+    assert usb.event_type == "device.connected" and usb.raw["vendor_id"] == "0781"
+    assert closed.event_type == "session.ended" and closed.user_name == "maya"
+    assert nm.event_type == "system.log" and nm.raw["priority"] == "6" and skipped == 0
+    # Without full capture the unmapped line is skipped as before.
+    assert map_linux_payload({"records": records[2:]})[1] == 1
+
+
+def test_full_capture_lines_skip_detection_and_expire(api_for, db) -> None:
+    from sqlalchemy import func, select, update
+
+    from app.models import Event
+
+    admin = api_for("admin")
+    key = create_source(admin, "ubuntu-desk-07 journal")
+    lines = [jr(i * 0.01, "NetworkManager", f"line {i}", host="ubuntu-desk-07") for i in range(5)]
+    r = admin.client.post("/api/v1/ingest/linux", json={"records": lines, "capture": "all"}, headers={"Authorization": f"Bearer {key}"})
+    assert r.status_code == 200 and r.json()["inserted"] == 5 and r.json()["alerts_created"] == 0
+    # Age them past the retention window; the next full-capture batch deletes them.
+    db.execute(update(Event).where(Event.event_type == "system.log").values(event_time=func.now() - __import__("datetime").timedelta(days=10)))
+    db.commit()
+    admin.client.post(
+        "/api/v1/ingest/linux", json={"records": [jr(20, "NetworkManager", "fresh", host="ubuntu-desk-07")], "capture": "all"}, headers={"Authorization": f"Bearer {key}"}
+    )
+    db.expire_all()
+    messages = [m for (m,) in db.execute(select(Event.message).where(Event.event_type == "system.log")).all()]
+    assert messages == ["fresh"]

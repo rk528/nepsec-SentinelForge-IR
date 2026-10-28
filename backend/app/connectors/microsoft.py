@@ -408,6 +408,30 @@ def windows_event(record: Record) -> dict[str, Any] | None:
     return None
 
 
+def windows_log(record: Record) -> dict[str, Any] | None:
+    """A full-capture Windows event that no mapping above describes, stored as ``system.log``."""
+    r = _flat(record)
+    when = _time(r.get("TimeCreated"), r.get("TimeGenerated"))
+    if when is None:
+        return None
+    host = _s(r.get("Computer") or r.get("MachineName"))
+    try:
+        event_id = int(r.get("EventID") or 0)
+    except (TypeError, ValueError):
+        event_id = 0
+    provider = _s(r.get("ProviderName"))
+    message = _s(record.get("Message"), 4000) or f"{provider or 'Windows'} event {event_id}"
+    return {
+        "event_time": when,
+        "event_type": "system.log",
+        "host": host.lower() if host else None,
+        "user_name": _account(r, "TargetUserName", "SubjectUserName"),
+        "process_name": provider,
+        "message": message,
+        "raw": {"source": "microsoft.windows", "event_id": event_id, "channel": _s(r.get("Channel") or r.get("LogName")), "level": _s(r.get("Level"), 32)},
+    }
+
+
 FORMATS: dict[str, Callable[[Record], dict[str, Any] | None]] = {
     "entra-signin": entra_signin,
     "entra-audit": entra_audit,
@@ -426,6 +450,8 @@ def map_records(fmt: str, payload: Any) -> tuple[list[EventIn], int]:
             mapped = mapper(record)
         except (AttributeError, KeyError, TypeError, ValueError):
             mapped = None
+        if mapped is None and fmt == "windows-event" and record.get("Capture") == "all":
+            mapped = windows_log(record)  # sent by Send-WindowsEvents.ps1 -CaptureAll
         if mapped is None:
             skipped += 1
             continue

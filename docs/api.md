@@ -60,6 +60,12 @@ A user signed in with an emailed temporary password (`must_change_password: true
 | PATCH | `/iocs/{id}` | analyst | Analyst verdict + note |
 | GET | `/playbooks`, `/playbooks/runs?incident_id=` | viewer | |
 | POST | `/playbooks/{id}/run` | analyst | `{incident_id, idempotency_key, parameters}` |
+| GET | `/custom-playbooks?incident_id=` | viewer | Your organisation's playbooks; with `incident_id`, ones whose `trigger_rules` match the incident's alerts come first with `suggested: true` |
+| POST | `/custom-playbooks` | lead | `{name, description, steps: [{kind: action\|task, title, action?, instructions?}], trigger_rules}`; `action` is a built-in playbook id |
+| PATCH / DELETE | `/custom-playbooks/{id}` | lead | Edit (runs already started keep their snapshot) / archive |
+| POST | `/custom-playbooks/{id}/start` | analyst | `{incident_id}`: starts a checklist run on an open incident |
+| GET | `/custom-playbook-runs?incident_id=` | viewer | Runs with each step's status, note, who and when |
+| POST | `/custom-playbook-runs/{id}/steps/{index}` | analyst | `{action: run\|complete\|skip\|reopen, note, parameters}`. `run` executes an automated step through `/playbooks/{id}/run` (same roles and approvals); `complete` a manual task (a note becomes evidence); `skip` needs a reason |
 | GET | `/response-actions` | viewer | |
 | POST | `/response-actions/{id}/decision` | lead, not the requester | `{decision, reason}` |
 | POST | `/response-actions/{id}/cancel` | requester or lead | |
@@ -76,7 +82,7 @@ A user signed in with an emailed temporary password (`must_change_password: true
 | POST | `/scenarios/{id}/run` | analyst in demo org, else admin | Injects synthetic events |
 | GET | `/system` | viewer | Version, migration revision, integration status (no secrets) |
 | POST | `/ingest/events` | ingest key | See below |
-| POST | `/ingest/linux` | ingest key | Linux journal records from the shipper (`{"records": [journalctl -o json objects]}`), at most 500; see [connectors-linux.md](connectors-linux.md) |
+| POST | `/ingest/linux` | ingest key | Linux journal records from the shipper (`{"records": [journalctl -o json objects], "capture": "security"\|"all"}`), at most 500. With `capture: all`, unmapped lines are stored as `system.log`; see [connectors-linux.md](connectors-linux.md) |
 | POST | `/ingest/fortigate` | ingest key | FortiGate syslog lines from the relay (`{"logs": [...]}`); see [connectors-fortigate.md](connectors-fortigate.md) |
 | POST | `/ingest/microsoft/{format}` | ingest key | Native Microsoft JSON: `entra-signin`, `entra-audit`, `defender-alert`, `windows-event`; see [connectors-microsoft.md](connectors-microsoft.md) |
 

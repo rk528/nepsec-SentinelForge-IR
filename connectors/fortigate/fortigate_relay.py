@@ -33,7 +33,9 @@ import threading
 import time
 import urllib.error
 import urllib.request
-from datetime import UTC, datetime
+from datetime import datetime, timezone
+
+UTC = timezone.utc  # noqa: UP017 - datetime.UTC needs Python 3.11; Ubuntu 22.04 ships 3.10
 
 COMMON_PORTS = {20, 21, 22, 25, 53, 80, 110, 123, 143, 389, 443, 465, 587, 636, 853, 993, 995, 3389, 5223, 8080, 8443}
 LARGE_TRANSFER = 10 * 1024 * 1024

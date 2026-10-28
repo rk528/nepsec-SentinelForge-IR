@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
 
+import { CustomPlaybookRuns } from "@/components/custom-runs";
 import { EventList, EvidenceList, Timeline } from "@/components/investigation";
 import {
   AlertStatusBadge,
@@ -408,8 +409,10 @@ function ResponseTab({ incident, events }: { incident: Incident; events: EventRe
 
   return (
     <div className="space-y-5 p-4">
+      <CustomPlaybookRuns incident={incident} externalIps={externalIps} />
+
       <div>
-        <h3 className="mb-2 text-xs font-medium tracking-wide text-subtle uppercase">Playbooks</h3>
+        <h3 className="mb-2 text-xs font-medium tracking-wide text-subtle uppercase">Built-in actions</h3>
         {!playbooks.data ? (
           <Skeleton className="h-24" />
         ) : (

@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     # Request body limits (bytes)
     max_body_bytes: int = 256 * 1024
     max_ingest_body_bytes: int = 1024 * 1024
+    # Full-capture log lines (event type system.log) are deleted after this many days so
+    # they cannot fill the database; security events are kept. Lines linked to an alert
+    # or incident are never deleted.
+    log_retention_days: int = 3
 
     # Rate limits (requests per window)
     login_rate_limit: int = 10
