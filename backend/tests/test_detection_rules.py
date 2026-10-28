@@ -102,3 +102,17 @@ def test_network_rule_watchlist_raises_severity() -> None:
 )
 def test_is_external_ip(ip, external) -> None:
     assert is_external_ip(ip) is external
+
+
+def test_rdp_fan_out_reports_each_burst_once() -> None:
+    from app.detection.fixtures import _rdp
+
+    burst = [_rdp(i, i * 4, f"srv-{i}") for i in range(1, 6)]
+    later = [_rdp(10 + i, 240 + i * 4, f"srv-{i}") for i in range(1, 4)]
+    matches = RULES_BY_ID["SF-LAT-001"].evaluate(burst + later, DetectionContext())
+    assert [m.evidence["trigger"] for m in matches] == ["fan_out", "fan_out"]
+
+
+def test_cred_rule_ignores_malformed_raw_values() -> None:
+    odd = EventView(id="x", event_time=T0, event_type="process.access", process_name="m.exe", raw={"target_image": ["lsass.exe"], "granted_access": "not-hex"})
+    assert RULES_BY_ID["SF-CRED-001"].evaluate([odd], DetectionContext()) == []

@@ -15,6 +15,7 @@ Skipped records are counted, never guessed at.
 
 from __future__ import annotations
 
+import html
 import ntpath
 import re
 from collections.abc import Callable
@@ -275,6 +276,17 @@ def _account(r: Record, *names: str) -> str | None:
     return None
 
 
+def _task_action(xml: str) -> str:
+    """'<Exec><Command>a.exe</Command><Arguments>-x</Arguments></Exec>' -> 'a.exe -x' (first Exec action)."""
+    if "&lt;" in xml:  # TaskContent nested inside Log Analytics EventData XML arrives escaped
+        xml = html.unescape(xml)
+    command = re.search(r"<Command>([^<]*)</Command>", xml)
+    if not command:
+        return ""
+    arguments = re.search(r"<Arguments>([^<]*)</Arguments>", xml[command.end() :])
+    return html.unescape(" ".join(x for x in (command.group(1).strip(), arguments.group(1).strip() if arguments else "") if x))[:8192]
+
+
 def windows_event(record: Record) -> dict[str, Any] | None:
     r = _flat(record)
     try:
@@ -316,6 +328,24 @@ def windows_event(record: Record) -> dict[str, Any] | None:
                 "dst_port": port,
                 "domain": _s(r.get("DestinationHostname")),
             }
+        if event_id == 10:
+            source = _s(r.get("SourceImage"), 1024)
+            return {
+                **base,
+                "event_type": "process.access",
+                "user_name": _s(r.get("SourceUser")),
+                "process_name": _exe(source),
+                "raw": {**base["raw"], "source_image": source, "target_image": _s(r.get("TargetImage"), 1024), "granted_access": _s(r.get("GrantedAccess"), 32)},
+            }
+        if event_id == 13:
+            return {
+                **base,
+                "event_type": "registry.set",
+                "user_name": _s(r.get("User")),
+                "process_name": _exe(r.get("Image")),
+                "command_line": _s(r.get("Details"), 8192),
+                "raw": {**base["raw"], "target_object": _s(r.get("TargetObject"), 1024), "event_type": _s(r.get("EventType"), 32)},
+            }
         if event_id == 22:
             return {**base, "event_type": "dns.query", "process_name": _exe(r.get("Image")), "domain": _s(r.get("QueryName"))}
         return None
@@ -324,6 +354,7 @@ def windows_event(record: Record) -> dict[str, Any] | None:
         user = _account(r, "TargetUserName")
         if user is None:
             return None
+        base["raw"]["logon_type"] = _s(r.get("LogonType"), 8)
         return {
             **base,
             "event_type": "auth.success" if event_id == 4624 else "auth.failure",
@@ -340,6 +371,18 @@ def windows_event(record: Record) -> dict[str, Any] | None:
             "process_name": _exe(r.get("NewProcessName")),
             "command_line": _s(r.get("CommandLine"), 8192),
             "parent_process": _exe(r.get("ParentProcessName")),
+        }
+    if event_id == 4698:
+        name = _s(r.get("TaskName"), 500)
+        action = _task_action(str(r.get("TaskContent") or ""))
+        return {
+            **base,
+            "event_type": "task.created",
+            "user_name": _account(r, "SubjectUserName"),
+            "process_name": _exe(action.split('"')[1] if action.startswith('"') else action.split(" ", 1)[0]) if action else None,
+            "command_line": action or None,
+            "message": f"Scheduled task {name or '(unnamed)'} created",
+            "raw": {**base["raw"], "task_name": name},
         }
     if event_id == 4720:
         return {**base, "event_type": "iam.user_created", "user_name": _account(r, "SubjectUserName"), "target_user": _s(r.get("TargetUserName"), 255)}

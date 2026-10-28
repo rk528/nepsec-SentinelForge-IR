@@ -29,20 +29,19 @@ TECHNIQUES: dict[str, dict[str, str]] = {
     "T1041": {"name": "Exfiltration Over C2 Channel", "tactic": "Exfiltration"},
     "T1071": {"name": "Application Layer Protocol", "tactic": "Command and Control"},
     "T1566.002": {"name": "Phishing: Spearphishing Link", "tactic": "Initial Access"},
-    # Known gaps: no rule and, in most cases, no telemetry collected.
     "T1003": {"name": "OS Credential Dumping", "tactic": "Credential Access"},
-    "T1021.001": {"name": "Remote Services: Remote Desktop Protocol", "tactic": "Lateral Movement"},
+    "T1003.001": {"name": "OS Credential Dumping: LSASS Memory", "tactic": "Credential Access"},
+    "T1003.002": {"name": "OS Credential Dumping: Security Account Manager", "tactic": "Credential Access"},
     "T1053.005": {"name": "Scheduled Task/Job: Scheduled Task", "tactic": "Persistence"},
     "T1547.001": {"name": "Boot or Logon Autostart Execution: Registry Run Keys", "tactic": "Persistence"},
+    "T1021.001": {"name": "Remote Services: Remote Desktop Protocol", "tactic": "Lateral Movement"},
+    "T1133": {"name": "External Remote Services", "tactic": "Initial Access"},
+    # Known gaps: no rule and no telemetry collected.
     "T1486": {"name": "Data Encrypted for Impact", "tactic": "Impact"},
     "T1567": {"name": "Exfiltration Over Web Service", "tactic": "Exfiltration"},
 }
 
 KNOWN_GAPS: dict[str, str] = {
-    "T1003": "No memory-access (LSASS handle) telemetry is collected.",
-    "T1021.001": "Logon type and RDP session telemetry is not normalised yet.",
-    "T1053.005": "Scheduled task creation events are not ingested.",
-    "T1547.001": "Registry modification telemetry is not ingested.",
     "T1486": "No file-system write volume telemetry; only shadow-copy deletion (T1490) is covered.",
     "T1567": "Proxy logs lack destination categorisation needed to separate sanctioned cloud storage.",
 }

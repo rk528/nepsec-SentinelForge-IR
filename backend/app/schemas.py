@@ -31,6 +31,10 @@ EVENT_TYPES = (
     "proxy.request",
     "email.delivered",
     "file.created",
+    "security.alert",
+    "process.access",
+    "registry.set",
+    "task.created",
 )
 EventType = Literal[
     "auth.success",
@@ -46,6 +50,9 @@ EventType = Literal[
     "email.delivered",
     "file.created",
     "security.alert",
+    "process.access",
+    "registry.set",
+    "task.created",
 ]
 
 

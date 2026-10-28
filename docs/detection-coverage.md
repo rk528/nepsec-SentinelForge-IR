@@ -1,6 +1,6 @@
 # Detection coverage
 
-Six rules (`backend/app/detection/rules.py`) evaluate normalised events. Each rule declares
+Eleven rules (`backend/app/detection/rules.py`) evaluate normalised events. Each rule declares
 required telemetry, rationale, false-positive considerations and ATT&CK techniques, and ships
 with labelled fixtures (`backend/app/detection/fixtures.py`).
 
@@ -19,6 +19,14 @@ with no rule (gaps).
 | SF-NET-001 | Suspicious outbound connection (non-standard port, ≥50 MiB upload, or watchlisted destination) | Medium (high on watchlist or multiple reasons) / low | `network.connection` with dst IP/port and bytes | T1571, T1041, T1071 |
 | SF-MAIL-001 | Emailed link visited by the recipient within 60 min | High / medium | `email.delivered` with URL/domain, `dns.query` or `proxy.request` with user | T1566.002, T1204.001 |
 | SF-EXT-001 | Medium/high alert forwarded from Microsoft Defender XDR or Entra ID Protection | From the alert (high / medium) | `security.alert` (Graph `alerts_v2`) | Taken from each alert (`mitreTechniques`); none claimed by the rule |
+| SF-CRED-001 | LSASS opened with memory-read rights by a non-allowlisted process, or a command line that dumps LSASS (comsvcs MiniDump, procdump) or saves the SAM/SECURITY/SYSTEM hives | Critical / medium | `process.access` (Sysmon 10) with `raw.target_image` and `raw.granted_access`; `process.start` | T1003, T1003.001, T1003.002 |
+| SF-PERS-001 | Scheduled task whose action runs an interpreter or proxy binary, a URL, or a program in a user-writable directory | High / medium | `task.created` (Security 4698) with the action in `command_line`; `process.start` of `schtasks /create` | T1053.005 |
+| SF-PERS-002 | Run/RunOnce value that launches an interpreter, a URL or a user-writable binary, or is written by an interpreter | High / medium | `registry.set` (Sysmon 13) with `raw.target_object`; `process.start` of `reg add` | T1547.001 |
+| SF-LAT-001 | RDP logon (type 10) from an external address, or one account opening RDP on 3 or more hosts within 30 min | High / medium | `auth.success` (Security 4624) with `raw.logon_type` | T1021.001, T1133 |
+
+Fields with no normalised column (logon type, registry key, LSASS access mask, task name) are
+read from the event's `raw` object. The Windows connector fills them; senders using the generic
+ingest API must supply the same `raw` keys for these rules to see them.
 
 Severity (impact if real) and confidence (likelihood the detection is right) are stored
 separately on every alert.
@@ -33,7 +41,7 @@ IDs are stored in `alert_events`.
 ## Evaluation results
 
 `python -m app.cli self-test` (or **Detections → Run self-test**) evaluates every rule
-against its fixtures and stores the results. Results from 27 October 2026:
+against its fixtures and stores the results. Results from 28 October 2026:
 
 | Rule | TP | FP | TN | FN | Precision | Recall | Result |
 |---|---|---|---|---|---|---|---|
@@ -44,6 +52,10 @@ against its fixtures and stores the results. Results from 27 October 2026:
 | SF-NET-001 | 3 | 0 | 2 | 1 | 1.00 | 0.75 | Pass (FN documented) |
 | SF-MAIL-001 | 1 | 1 | 3 | 0 | 0.50 | 1.00 | Pass (FP documented) |
 | SF-EXT-001 | 2 | 0 | 2 | 0 | 1.00 | 1.00 | Pass |
+| SF-CRED-001 | 3 | 0 | 3 | 2 | 1.00 | 0.60 | Pass (FNs documented) |
+| SF-PERS-001 | 3 | 1 | 2 | 0 | 0.75 | 1.00 | Pass (FP documented) |
+| SF-PERS-002 | 3 | 0 | 2 | 1 | 1.00 | 0.75 | Pass (FN documented) |
+| SF-LAT-001 | 2 | 1 | 4 | 0 | 0.67 | 1.00 | Pass (FP documented) |
 
 A rule "passes" when every case is classified correctly except cases explicitly marked as known
 limitations. These fixtures are small and hand-written: the numbers show that rules behave as
@@ -61,12 +73,17 @@ request, because detection runs inline.
 | SF-PROC-001 | Base64 decoded via `FromBase64String` without `-enc` | Pattern list, not behaviour |
 | SF-NET-001 | C2 beaconing over 443 to a non-watchlisted host | No frequency/beacon analysis |
 | SF-MAIL-001 | Wanted newsletter clicked (false positive) | Cannot judge intent; relies on triage |
+| SF-CRED-001 | Dumper renamed to an allowlisted image name (e.g. `msmpeng.exe`) | Allowlist matches names, not paths or signatures |
+| SF-CRED-001 | `comsvcs.dll #24` (MiniDump by ordinal) | Command-line pattern only; Sysmon 10 still sees the LSASS read |
+| SF-PERS-001 | Per-user OneDrive updater task in AppData (false positive) | Legitimate updaters live in user-writable paths; also fires once per host when this platform's own PowerShell shipper is registered |
+| SF-PERS-002 | Payload dropped under Program Files by an admin | Path heuristic trusts Program Files |
+| SF-LAT-001 | Admin patching four servers over RDP (false positive) | Maintenance and lateral movement look alike without a baseline |
 
 ## Gaps (no rule)
 
-T1003 credential dumping, T1021.001 RDP, T1053.005 scheduled tasks, T1547.001 run keys, T1486
-encryption for impact, T1567 exfiltration to web services. Reasons are shown in the coverage
-view, most often "telemetry not collected".
+T1486 encryption for impact and T1567 exfiltration to web services. Reasons are shown in the
+coverage view. T1003, T1021.001, T1053.005 and T1547.001 were gaps until the Windows connector
+started collecting Sysmon 10/13, event 4698 and logon types; they are now covered above.
 
 ## Sigma
 

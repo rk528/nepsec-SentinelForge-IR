@@ -75,6 +75,9 @@ class EventView:
     email_subject: str | None = None
     bytes_out: int | None = None
     message: str | None = None
+    # Source-specific fields with no normalised column (logon type, registry key,
+    # access mask). Untrusted input: rules must treat every value as data.
+    raw: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -141,3 +144,9 @@ def of_type(events: Iterable[EventView], *types: str) -> list[EventView]:
 
 def lower(value: str | None) -> str:
     return (value or "").lower()
+
+
+def raw_str(e: EventView, key: str) -> str:
+    """A raw field as a lower-case string ("" when missing or not scalar)."""
+    value = e.raw.get(key) if isinstance(e.raw, dict) else None
+    return str(value).strip().lower() if isinstance(value, (str, int)) and not isinstance(value, bool) else ""

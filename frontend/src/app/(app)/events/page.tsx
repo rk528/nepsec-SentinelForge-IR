@@ -13,7 +13,7 @@ import { formatDateTime, utcTitle } from "@/lib/format";
 import { useUrlState } from "@/lib/hooks";
 import type { DataSource, EventRecord, Page } from "@/lib/types";
 
-const EVENT_TYPES = ["auth.success", "auth.failure", "process.start", "iam.user_created", "iam.group_member_added", "log.cleared", "service.stopped", "network.connection", "dns.query", "proxy.request", "email.delivered", "file.created", "security.alert"];
+const EVENT_TYPES = ["auth.success", "auth.failure", "process.start", "iam.user_created", "iam.group_member_added", "log.cleared", "service.stopped", "network.connection", "dns.query", "proxy.request", "email.delivered", "file.created", "security.alert", "process.access", "registry.set", "task.created"];
 
 const RANGES = [
   { value: "24", label: "24h" },

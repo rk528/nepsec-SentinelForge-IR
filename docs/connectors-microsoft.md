@@ -12,7 +12,7 @@ Authorization: Bearer sfk_...        # the data source's ingest key
 | `entra-signin` | Entra ID sign-in logs (Graph `auditLogs/signIns`, Azure Monitor `SignInLogs`) | `auth.success`, `auth.failure` | SF-AUTH-001 |
 | `entra-audit` | Entra ID audit logs (Graph `auditLogs/directoryAudits`, Azure Monitor `AuditLogs`): *Add user*, *Add member to role* (incl. PIM), *Add member to group* | `iam.user_created`, `iam.group_member_added` | SF-IAM-001 |
 | `defender-alert` | Microsoft Defender XDR / Defender for Cloud / Entra ID Protection alerts (Graph `security/alerts_v2`) | `security.alert` | SF-EXT-001 |
-| `windows-event` | Windows Security, System and Sysmon logs (shipper script, or Log Analytics `SecurityEvent`) | auth, process, IAM, log-cleared, service-stopped, network, DNS events | SF-AUTH-001, SF-PROC-001, SF-IAM-001, SF-DEF-001, SF-NET-001 |
+| `windows-event` | Windows Security, System and Sysmon logs (shipper script, or Log Analytics `SecurityEvent`) | auth (with logon type), process, process access, registry, scheduled task, IAM, log-cleared, service-stopped, network, DNS events | SF-AUTH-001, SF-PROC-001, SF-IAM-001, SF-DEF-001, SF-NET-001, SF-CRED-001, SF-PERS-001, SF-PERS-002, SF-LAT-001 |
 
 The body can be a Graph response (`{"value": [...]}`), an Azure Monitor export
 (`{"records": [...]}`), a JSON array, or one record; at most 500 records per request and
@@ -64,8 +64,10 @@ Sign-in logs through Graph need an **Entra ID P1 or P2** licence; without one, u
 ## 2b. Windows servers and workstations
 
 [`connectors/windows/Send-WindowsEvents.ps1`](../connectors/windows/Send-WindowsEvents.ps1)
-reads the event IDs the detections use (4624, 4625, 4688, 4720, 4728, 4732, 4756, 1102;
-System 7036 and 104; Sysmon 1, 3, 22 when installed) and posts them. Run as Administrator.
+reads the event IDs the detections use (4624, 4625, 4688, 4698, 4720, 4728, 4732, 4756, 1102;
+System 7036 and 104; Sysmon 1, 3, 10, 13, 22 when installed) and posts them. Run as Administrator.
+To limit volume it sends Sysmon 10 only when the target is `lsass.exe` and Sysmon 13 only for
+Run/RunOnce keys.
 
 ```powershell
 [Environment]::SetEnvironmentVariable('SENTINELFORGE_INGEST_KEY', 'sfk_...', 'Machine')
@@ -79,7 +81,13 @@ Register-ScheduledTask -TaskName 'SentinelForge event shipper' -Action $action -
 
 Process command lines in 4688 need *Include command line in process creation events*
 (Group Policy → Administrative Templates → System → Audit Process Creation). Logon and
-account-management auditing must be enabled in the Advanced Audit Policy.
+account-management auditing must be enabled in the Advanced Audit Policy. Scheduled task
+creation (4698) needs *Object Access > Audit Other Object Access Events*. Sysmon 10 and 13
+must be enabled in your Sysmon configuration (for example, rules for `TargetImage` ending in
+`lsass.exe` and `TargetObject` containing `CurrentVersion\Run`).
+
+The shipper's own scheduled task runs PowerShell, so SF-PERS-001 raises one alert per host
+when you register it. Close it as benign positive (runbook RB-8).
 
 ## 2c. Azure Monitor / Microsoft Sentinel (no script)
 

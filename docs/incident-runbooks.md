@@ -61,3 +61,33 @@ activity expected), **false positive** (rule fired on activity outside its inten
 - Check proxy logs for credential submission (POST) versus a single page view.
 - Contain: purge the message, block the domain, reset credentials if submitted *(manual)*.
 - Close newsletters and wanted mail as benign positive.
+
+## RB-7 Credential dumping (SF-CRED-001)
+
+- Treat as critical: assume every credential cached on the host is exposed.
+- Identify the source process and its parent in *Related events*; check its hash and path
+  (an allowlisted name outside `System32` or the Defender platform folder is suspicious).
+- List accounts that signed in to the host recently (Events, host pivot, `auth.success`).
+- Contain: isolate the host *(manual)*; reset passwords of exposed accounts, starting with
+  privileged ones; for domain controllers consider a double `krbtgt` reset *(manual)*.
+- Close as benign positive only when a named security or support tool and a change record
+  explain the access.
+
+## RB-8 Scheduled task or Run key persistence (SF-PERS-001, SF-PERS-002)
+
+- Read the task action or registry value in the evidence (inert text; do not run it).
+- Find who created it and what ran just before (*Related events*, same host and user).
+- Look up any file path or URL it references; collect the binary *(manual)*.
+- Contain: disable the task or delete the value *(manual)* after collecting it as evidence,
+  then hunt for the same payload hash or name on other hosts.
+- The SentinelForge shipper's own task (`powershell.exe -File ...Send-WindowsEvents.ps1`)
+  raises SF-PERS-001 once per host at install: close it as benign positive.
+
+## RB-9 Suspicious RDP (SF-LAT-001)
+
+- External source: confirm whether RDP should be reachable from the internet at all; if not,
+  the exposure itself is a finding. Pivot on the source IP in Threat intel.
+- Fan-out: compare the hosts and time with change records; check whether the account
+  normally administers those hosts.
+- Contain: disable or reset the account and end its sessions *(manual)*; request a
+  simulated block of an external source IP; close RDP exposure at the firewall.

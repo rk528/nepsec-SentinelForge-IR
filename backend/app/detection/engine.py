@@ -43,6 +43,7 @@ def to_view(e: Event) -> EventView:
         email_subject=e.email_subject,
         bytes_out=e.bytes_out,
         message=e.message,
+        raw=e.raw or {},
     )
 
 

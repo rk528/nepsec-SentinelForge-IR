@@ -9,10 +9,15 @@
     every 5 minutes.
 
     Events read:
-      Security  4624 4625 (logons), 4688 (process creation), 4720 (user created),
-                4728 4732 4756 (added to a privileged group), 1102 (log cleared)
+      Security  4624 4625 (logons), 4688 (process creation), 4698 (scheduled task created),
+                4720 (user created), 4728 4732 4756 (added to a privileged group), 1102 (log cleared)
       System    7036 (service stopped), 104 (log cleared)
-      Sysmon    1 (process), 3 (network connection), 22 (DNS query), when installed
+      Sysmon    1 (process), 3 (network connection), 10 (process access, LSASS only),
+                13 (registry value set, Run keys only), 22 (DNS query), when installed
+
+    Event 4698 needs 'Audit Other Object Access Events' enabled; Sysmon 10 and 13 need
+    a Sysmon configuration that logs them (most community configs log LSASS access and
+    Run key writes).
 
     The ingest key is read from the SENTINELFORGE_INGEST_KEY environment variable
     (machine scope), never from the command line, so it stays out of process listings.
@@ -48,13 +53,13 @@ if (Test-Path $StateFile) {
 $start = $since.ToLocalTime()
 
 $queries = @(
-    @{ LogName = 'Security'; Id = 4624, 4625, 4688, 4720, 4728, 4732, 4756, 1102; StartTime = $start },
+    @{ LogName = 'Security'; Id = 4624, 4625, 4688, 4698, 4720, 4728, 4732, 4756, 1102; StartTime = $start },
     # Other providers reuse ID 7036, so only the Service Control Manager's is a service state change.
     @{ LogName = 'System'; ProviderName = 'Service Control Manager'; Id = 7036; StartTime = $start },
     @{ LogName = 'System'; ProviderName = 'Microsoft-Windows-Eventlog'; Id = 104; StartTime = $start }
 )
 if (Get-WinEvent -ListLog 'Microsoft-Windows-Sysmon/Operational' -ErrorAction SilentlyContinue) {
-    $queries += @{ LogName = 'Microsoft-Windows-Sysmon/Operational'; Id = 1, 3, 22; StartTime = $start }
+    $queries += @{ LogName = 'Microsoft-Windows-Sysmon/Operational'; Id = 1, 3, 10, 13, 22; StartTime = $start }
 }
 
 $records = New-Object System.Collections.Generic.List[object]
@@ -68,6 +73,11 @@ foreach ($q in $queries) {
             if ($d.Name) { $data[$d.Name] = [string]$d.'#text' }
         }
         if ($e.Id -eq 4624 -and -not $IncludeNetworkLogons -and $data['LogonType'] -eq '3') { continue }
+        if ($q.LogName -like '*Sysmon*') {
+            # Process access and registry events are high volume; send only what the detections read.
+            if ($e.Id -eq 10 -and $data['TargetImage'] -notlike '*\lsass.exe') { continue }
+            if ($e.Id -eq 13 -and $data['TargetObject'] -notmatch '\\CurrentVersion\\Run(Once)?(Ex)?\\') { continue }
+        }
         if ($e.Id -in 4728, 4732, 4756 -and ($data['MemberName'] -in $null, '', '-') -and $data['MemberSid']) {
             # Local group changes record only the member's SID; resolve it so it matches the 4720 account name.
             try { $data['MemberName'] = ([Security.Principal.SecurityIdentifier]$data['MemberSid']).Translate([Security.Principal.NTAccount]).Value } catch { }

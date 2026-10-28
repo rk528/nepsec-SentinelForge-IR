@@ -11,15 +11,15 @@ PostgreSQL 16 with [pgserver](https://pypi.org/project/pgserver/); CI uses a `po
 service container. Migrations are applied with Alembic at session start, so the migration
 itself is tested.
 
-**Result: 115 passed.**
+**Result: 127 passed.**
 
 | File | Covers |
 |---|---|
-| `test_detection_rules.py` | Every rule passes its fixtures; metadata completeness; threshold boundaries; event ID preservation; hostile command lines treated as data; IP classification |
+| `test_detection_rules.py` | Every rule passes its fixtures; metadata completeness; threshold boundaries; event ID preservation; hostile command lines treated as data; IP classification; RDP fan-out reported once per burst; malformed raw fields ignored |
 | `test_workflow.py` | Ingest → detect → alert → escalate → notes → transitions → close → timeline → report → audit; idempotent re-ingest; detection re-runs; reopen rules |
 | `test_security.py` | Auth required; generic login errors; password not echoed; login rate limit; CSRF; logout revocation; idle expiry; cookie flags; viewer/admin restrictions; ingest key; cross-tenant reads and writes (IDOR); assignee scoping; malicious payloads; Markdown escaping; validation; body size; append-only audit |
 | `test_response.py` | All playbooks; idempotency; separation of duties; internal IP refusal; closure blocked by pending actions; demo seed, login, restrictions, reset; first demo sign-in seeds; dashboard metrics without data; ATT&CK coverage states |
-| `test_microsoft.py` | Entra ID sign-in and audit, Defender alert and Windows event mapping (Graph, Azure Monitor, Log Analytics and PowerShell shapes); MFA interrupts and machine logons skipped; alerts raised end to end; re-forwarded alerts de-duplicated; batch limits; ingest key required |
+| `test_microsoft.py` | Entra ID sign-in and audit, Defender alert and Windows event mapping (Graph, Azure Monitor, Log Analytics and PowerShell shapes); MFA interrupts and machine logons skipped; Sysmon 10/13, task creation (4698, incl. escaped Log Analytics XML) and RDP logon types; alerts raised end to end; re-forwarded alerts de-duplicated; batch limits; ingest key required |
 | `test_fortigate.py` | FortiOS key=value and JSON lines, syslog headers, time zones, SSL-VPN brute force end to end, traffic/DNS/web filter/IPS mapping, relay traffic filter |
 | `test_intel.py` | IOC normalisation (refanging, canonical URLs, hashes), invalid input, unconfigured providers, provider mapping, caching, rate-limit handling, "zero detections is unknown", timeouts, analyst vs provider verdicts |
 

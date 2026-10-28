@@ -101,5 +101,8 @@ Rules: 1–500 events per request, body up to 1 MiB, timestamps must include a t
 not be more than 5 minutes in the future, unknown fields are rejected, IPs are validated, and
 `event_type` must be one of `auth.success, auth.failure, process.start, iam.user_created,
 iam.group_member_added, log.cleared, service.stopped, network.connection, dns.query,
-proxy.request, email.delivered, file.created`. Re-sending an identical event is a no-op
+proxy.request, email.delivered, file.created, security.alert, process.access, registry.set,
+task.created`. Some rules read source-specific fields from `raw`: `logon_type` (SF-LAT-001),
+`target_image` and `granted_access` (SF-CRED-001), `target_object` (SF-PERS-002) and
+`task_name` (SF-PERS-001). Re-sending an identical event is a no-op
 (fingerprint de-duplication). Rate limit: 60 requests per minute per source by default.
