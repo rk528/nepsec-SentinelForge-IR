@@ -114,6 +114,7 @@ A five-minute walkthrough and three case studies: [docs/portfolio-demo.md](docs/
 | [connectors-microsoft.md](docs/connectors-microsoft.md) | Sending Entra ID, Defender and Windows logs |
 | [connectors-fortigate.md](docs/connectors-fortigate.md) | FortiGate syslog relay and FortiOS configuration |
 | [connectors-linux.md](docs/connectors-linux.md) | Ubuntu Server and Desktop: journal shipper, systemd timer, checks |
+| [Endpoint Connection Manual (PDF)](docs/manual/SentinelForge-IR-Endpoint-Connection-Manual.pdf) | Connecting Ubuntu Desktop, Ubuntu Server and Windows machines, with screenshots |
 | [Data Source Connection Manual (PDF)](docs/manual/SentinelForge-IR-Data-Source-Manual.pdf) | Full step-by-step guide for every log source, threat intel, verification and troubleshooting |
 | [deployment.md](docs/deployment.md) | Vercel + Neon setup, migrations, rollback |
 | [free-tier-limitations.md](docs/free-tier-limitations.md) | Verified limits and implications |

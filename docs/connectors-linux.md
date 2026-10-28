@@ -5,6 +5,9 @@ since 16.04 uses on both Server and Desktop. A small shipper runs on each machin
 minutes and posts new records to the API. Nothing listens on the machine and no inbound port
 is opened.
 
+A step-by-step guide with screenshots for Ubuntu Desktop, Ubuntu Server and Windows is in the
+[Endpoint Connection Manual (PDF)](manual/SentinelForge-IR-Endpoint-Connection-Manual.pdf).
+
 ```mermaid
 flowchart LR
     J[systemd journal<br/>sshd, PAM, sudo, useradd, systemd] --> S[sentinelforge_linux_shipper.py<br/>systemd timer, every 5 min]

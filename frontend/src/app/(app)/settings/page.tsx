@@ -43,7 +43,7 @@ function OneTimeKey({ secret, onClose }: { secret: string | null; onClose: () =>
       </div>
       <p className="mt-3 text-sm text-muted">
         Shippers send it as <span className="mono text-fg">Authorization: Bearer &lt;key&gt;</span>. Endpoints: <span className="mono text-fg">/api/v1/ingest/events</span> (normalised JSON),{" "}
-        <span className="mono text-fg">/ingest/microsoft/…</span> (Entra ID, Defender, Windows) and <span className="mono text-fg">/ingest/fortigate</span> (FortiGate relay). See the connector guides in docs/.
+        <span className="mono text-fg">/ingest/microsoft/…</span> (Entra ID, Defender, Windows), <span className="mono text-fg">/ingest/linux</span> (Ubuntu and other Linux) and <span className="mono text-fg">/ingest/fortigate</span> (FortiGate relay). See the connector guides in docs/.
       </p>
     </Dialog>
   );

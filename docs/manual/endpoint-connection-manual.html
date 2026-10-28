@@ -1,0 +1,382 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SentinelForge IR – Endpoint Connection Manual</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 20mm 16mm; }
+  :root {
+    --ink: #18181b; --muted: #52525b; --line: #e4e4e7; --soft: #f4f4f5;
+    --accent: #6d28d9; --accent-soft: #f3efff; --warn: #9a3412; --warn-soft: #fff4ec; --ok: #166534; --ok-soft: #effaf2;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #fff; color: var(--ink); }
+  body { font-family: "Segoe UI", Inter, system-ui, -apple-system, Arial, sans-serif; font-size: 10.2pt; line-height: 1.5; }
+  h1, h2, h3, h4 { color: #09090b; line-height: 1.25; margin: 0; }
+  h2 { font-size: 17pt; margin: 0 0 4mm; padding-bottom: 2mm; border-bottom: 2px solid var(--accent); }
+  h3 { font-size: 12.5pt; margin: 6mm 0 2mm; break-after: avoid; }
+  h4 { font-size: 10.6pt; margin: 4mm 0 1.5mm; break-after: avoid; }
+  p { margin: 0 0 2.6mm; }
+  a { color: var(--accent); text-decoration: none; }
+  code, pre, .mono { font-family: "Cascadia Mono", Consolas, "JetBrains Mono", monospace; }
+  code { font-size: 8.8pt; background: var(--soft); border: 1px solid var(--line); border-radius: 3px; padding: 0 3px; word-break: break-word; }
+  pre { font-size: 8.4pt; line-height: 1.45; background: #fafafa; border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 4px; padding: 3mm 3.5mm; margin: 2mm 0 3.5mm; white-space: pre-wrap; word-break: break-word; break-inside: avoid; }
+  table { width: 100%; border-collapse: collapse; margin: 2mm 0 4mm; font-size: 9.2pt; }
+  tr { break-inside: avoid; }
+  th, td { text-align: left; vertical-align: top; padding: 1.6mm 2.2mm; border-bottom: 1px solid var(--line); }
+  th { background: var(--soft); font-weight: 600; border-bottom: 1px solid #d4d4d8; }
+  ol, ul { margin: 0 0 3mm; padding-left: 6mm; }
+  li { margin: 0 0 1.2mm; }
+  .chapter { break-before: page; }
+  .lead { font-size: 11pt; color: var(--muted); }
+  .note, .warn, .ok { border-radius: 5px; padding: 2.6mm 3.5mm; margin: 2.5mm 0 3.5mm; break-inside: avoid; font-size: 9.6pt; }
+  .note { background: var(--accent-soft); border: 1px solid #ddd2ff; }
+  .warn { background: var(--warn-soft); border: 1px solid #fbd5bd; }
+  .ok { background: var(--ok-soft); border: 1px solid #c6ebd1; }
+  .note b:first-child, .warn b:first-child, .ok b:first-child { display: block; margin-bottom: 0.8mm; }
+  .step { display: grid; grid-template-columns: 8mm 1fr; gap: 3mm; margin: 0 0 3mm; break-inside: avoid; }
+  .step .n { width: 7mm; height: 7mm; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 700; font-size: 9.5pt; display: grid; place-items: center; }
+  .step .b > :last-child { margin-bottom: 0; }
+
+  .cover { height: 255mm; display: flex; flex-direction: column; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 4mm; }
+  .logo { width: 14mm; height: 14mm; border-radius: 3.5mm; background: var(--accent); display: grid; place-items: center; }
+  .cover h1 { font-size: 30pt; letter-spacing: -0.5px; margin: 0 0 4mm; }
+  .cover .sub { font-size: 14pt; color: var(--muted); max-width: 150mm; }
+  .cover .meta { border-top: 1px solid var(--line); padding-top: 5mm; font-size: 9.6pt; color: var(--muted); display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; }
+  .cover .meta b { display: block; color: var(--ink); }
+  .pills { display: flex; flex-wrap: wrap; gap: 2mm; margin-top: 8mm; }
+  .pills span { border: 1px solid var(--line); border-radius: 99px; padding: 1mm 3.5mm; font-size: 9.5pt; background: var(--soft); }
+  .toc { list-style: none; padding: 0; margin: 4mm 0 0; }
+  .toc li { display: flex; gap: 3mm; padding: 2mm 0; border-bottom: 1px dotted #d4d4d8; margin: 0; }
+  .toc .num { width: 9mm; color: var(--accent); font-weight: 700; }
+  .toc .t { flex: 1; }
+  .toc .d { color: var(--muted); font-size: 9pt; }
+
+  .flow { display: grid; grid-template-columns: 1fr 9mm 1fr 9mm 1fr; align-items: center; margin: 3mm 0 5mm; break-inside: avoid; }
+  .box { border: 1px solid #d4d4d8; border-radius: 5px; padding: 2.5mm 3mm; background: #fff; font-size: 9pt; min-height: 22mm; }
+  .box b { display: block; font-size: 9.8pt; margin-bottom: 1mm; }
+  .box.hl { border-color: #bda7ff; background: var(--accent-soft); }
+  .arrow { text-align: center; color: var(--accent); font-size: 15pt; font-weight: 700; }
+  .stack { display: flex; flex-direction: column; gap: 2mm; }
+  .stack .box { min-height: 0; }
+
+  /* Real screenshots of the SentinelForge web app */
+  figure { margin: 2mm 0 4mm; break-inside: avoid; }
+  figure img { display: block; width: 100%; border: 1px solid var(--line); border-radius: 5px; }
+  figure.narrow img { width: 62%; }
+  figcaption { font-size: 8.6pt; color: var(--muted); margin-top: 1.5mm; }
+  figcaption b { color: var(--ink); font-weight: 600; }
+
+  /* Terminal illustrations (drawn, not screenshots) */
+  .term { border-radius: 6px; overflow: hidden; margin: 2mm 0 1.5mm; break-inside: avoid; border: 1px solid #27272a; }
+  .term .bar { display: flex; align-items: center; gap: 1.6mm; padding: 1.6mm 3mm; font-size: 8.2pt; }
+  .term .bar i { width: 2.6mm; height: 2.6mm; border-radius: 50%; display: inline-block; }
+  .term .bar span { margin-left: 2mm; }
+  .term pre { margin: 0; border: 0; border-radius: 0; font-size: 8.2pt; padding: 3mm 3.5mm; }
+  .term.ubuntu .bar { background: #3d3846; color: #f6f5f4; }
+  .term.ubuntu .bar i:nth-child(1) { background: #e95420; } .term.ubuntu .bar i:nth-child(2), .term.ubuntu .bar i:nth-child(3) { background: #77767b; }
+  .term.ubuntu pre { background: #300a24; color: #f2f2f2; }
+  .term.ps .bar { background: #f3f3f3; color: #1f1f1f; border-bottom: 1px solid #ddd; }
+  .term.ps .bar i { display: none; }
+  .term.ps pre { background: #012456; color: #eeedf0; }
+  .term .p { color: #8ae234; } .term .u { color: #729fcf; } .term .dim { opacity: .7; } .term .y { color: #fce94f; }
+  .term.ps .p { color: #ffff00; }
+  .illus { font-size: 8.2pt; color: var(--muted); margin: 0 0 4mm; font-style: italic; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm; }
+  .check { list-style: none; padding-left: 0; }
+  .check li::before { content: "☐"; color: var(--accent); margin-right: 2.5mm; font-size: 10.5pt; }
+</style>
+</head>
+<body>
+
+<!-- ============================== COVER ============================== -->
+<section class="cover">
+  <div class="brand">
+    <div class="logo">
+      <svg viewBox="0 0 32 32" width="34" height="34" fill="none"><path d="M16 2.5 27.7 9.25v13.5L16 29.5 4.3 22.75V9.25L16 2.5Z" stroke="#fff" stroke-width="2.2" stroke-linejoin="round"/><path d="m10.5 13.5 5.5 5 5.5-5" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 18.5V24" stroke="#fff" stroke-width="2.4" stroke-linecap="round" opacity=".6"/></svg>
+    </div>
+    <div><b style="font-size:13pt">SentinelForge IR</b><br><span style="color:var(--muted)">Incident response &amp; security engineering</span></div>
+  </div>
+  <div>
+    <h1>Endpoint Connection Manual</h1>
+    <p class="sub">How to connect Ubuntu Desktop, Ubuntu Server and Windows machines to SentinelForge IR so their sign-ins, admin activity and security events are collected and checked by the detections.</p>
+    <div class="pills"><span>Ubuntu Desktop 20.04+</span><span>Ubuntu Server 20.04+</span><span>Windows 10 / 11</span><span>Windows Server 2016+</span><span>Sysmon (optional)</span></div>
+  </div>
+  <div class="meta">
+    <div><b>Application</b>https://sentinelforge.kuinkel.com</div>
+    <div><b>Ingestion API</b>https://sentinelforge-api.kuinkel.com</div>
+    <div><b>Version</b>Manual 1.0 · 28 October 2026</div>
+  </div>
+</section>
+
+<!-- ============================== CONTENTS ============================== -->
+<section class="chapter">
+  <h2>Contents</h2>
+  <ol class="toc">
+    <li><span class="num">1</span><span class="t">How endpoint collection works<br><span class="d">What runs on each machine, what you need before you start</span></span></li>
+    <li><span class="num">2</span><span class="t">Create a data source and ingest key<br><span class="d">One per machine, in the SentinelForge web app</span></span></li>
+    <li><span class="num">3</span><span class="t">Ubuntu Desktop<br><span class="d">Copy the shipper, install it, confirm sign-ins and sudo appear</span></span></li>
+    <li><span class="num">4</span><span class="t">Ubuntu Server<br><span class="d">Install over SSH, persistent journal, SSH brute-force test</span></span></li>
+    <li><span class="num">5</span><span class="t">Windows workstations and servers<br><span class="d">Audit policy, optional Sysmon, PowerShell shipper, scheduled task</span></span></li>
+    <li><span class="num">6</span><span class="t">Verify: events and alerts<br><span class="d">What you should see in SentinelForge after the first run</span></span></li>
+    <li><span class="num">7</span><span class="t">Operations and troubleshooting<br><span class="d">Rotate keys, re-send history, uninstall, common errors</span></span></li>
+  </ol>
+  <div class="note"><b>About the pictures in this manual</b>Screenshots of the SentinelForge web app are real captures of the application, taken from a test workspace filled with synthetic data (documentation IP addresses such as 203.0.113.50 and invented host and user names). Terminal windows are drawn illustrations of the commands and the output the scripts print; your host names, counts and times will differ.</div>
+</section>
+
+<!-- ============================== 1 ============================== -->
+<section class="chapter">
+  <h2>1. How endpoint collection works</h2>
+  <p class="lead">A small shipper runs on each machine every five minutes. It reads the machine's own security logs since its last run and posts them over HTTPS to SentinelForge with that machine's ingest key. Nothing listens on the machine and no inbound port is opened.</p>
+  <div class="flow">
+    <div class="stack">
+      <div class="box"><b>Ubuntu Desktop / Server</b>systemd journal: SSH, sign-ins, sudo, user and group changes, services stopping</div>
+      <div class="box"><b>Windows</b>Security, System and Sysmon event logs</div>
+    </div>
+    <div class="arrow">→</div>
+    <div class="box hl"><b>Shipper (every 5 min)</b>Linux: systemd timer running a Python script as a locked account.<br>Windows: scheduled task running a PowerShell script as SYSTEM.</div>
+    <div class="arrow">→</div>
+    <div class="box"><b>SentinelForge IR</b>HTTPS 443 to <code>sentinelforge-api.kuinkel.com</code>. Events are normalised and the detection rules run immediately.</div>
+  </div>
+
+  <h3>What each machine contributes</h3>
+  <table>
+    <tr><th style="width:32mm">Machine</th><th>Collected</th><th style="width:52mm">Detections that use it</th></tr>
+    <tr><td>Ubuntu Desktop</td><td>Greeter (GDM/LightDM) and console sign-ins and failures, <code>sudo</code> commands and failed <code>sudo</code>/<code>su</code> passwords, account and group changes</td><td>SF-IAM-001 new privileged account; investigations</td></tr>
+    <tr><td>Ubuntu Server</td><td>SSH logins and failures with source IP, <code>sudo</code> commands, <code>useradd</code>/<code>usermod</code>/<code>gpasswd</code>, <code>auditd</code>/<code>rsyslog</code>/<code>journald</code> stopping</td><td>SF-AUTH-001 password guessing, SF-IAM-001, SF-DEF-001 logging stopped</td></tr>
+    <tr><td>Windows</td><td>Logons (with logon type), process creation, scheduled task creation, account and group changes, log clearing, services stopping; with Sysmon also LSASS access, Run-key writes, network and DNS</td><td>SF-AUTH-001, SF-PROC-001, SF-IAM-001, SF-DEF-001, SF-CRED-001, SF-PERS-001/002, SF-LAT-001</td></tr>
+  </table>
+
+  <h3>Before you start</h3>
+  <ul class="check">
+    <li>A SentinelForge <b>admin</b> account (demo accounts cannot create data sources).</li>
+    <li>Administrator rights on each machine: <code>sudo</code> on Ubuntu, a local Administrator on Windows.</li>
+    <li>Outbound HTTPS (TCP 443) from each machine to <code>sentinelforge-api.kuinkel.com</code>. Check with <code>curl -sI https://sentinelforge-api.kuinkel.com/api/v1/health</code> (Ubuntu) or <code>Invoke-RestMethod https://sentinelforge-api.kuinkel.com/api/v1/health</code> (Windows).</li>
+    <li>The connector files from the repository: <code>connectors/linux/</code> (two files) and <code>connectors/windows/Send-WindowsEvents.ps1</code>.</li>
+  </ul>
+  <div class="warn"><b>Treat ingest keys like passwords</b>Anyone with a key can send events as that machine. Paste it only into the installer prompt or the machine-level setting described below, never into scripts, tickets or chat. If a key leaks, rotate it (chapter 7).</div>
+</section>
+
+<!-- ============================== 2 ============================== -->
+<section class="chapter">
+  <h2>2. Create a data source and ingest key</h2>
+  <p class="lead">Create one data source per machine. Each gets its own key, and Settings shows each machine's health separately.</p>
+
+  <div class="step"><div class="n">1</div><div class="b"><p>Sign in at <code>https://sentinelforge.kuinkel.com</code> as an admin and open <b>Settings</b> (bottom of the left menu). Scroll to <b>Data sources</b> and click <b>Add source</b>.</p></div></div>
+  <div class="step"><div class="n">2</div><div class="b"><p>Name it after the machine's host name and choose the type:</p>
+    <table>
+      <tr><th style="width:45mm">Machine</th><th>Type</th></tr>
+      <tr><td>Ubuntu Desktop or Server</td><td><code>linux</code></td></tr>
+      <tr><td>Windows (with or without Sysmon)</td><td><code>windows_security</code></td></tr>
+    </table>
+    <figure class="narrow"><img src="assets/endpoint-add-source.png" alt="Add data source dialog with name ubuntu-srv-02 and type linux"><figcaption><b>Figure 1.</b> Adding a data source for an Ubuntu server.</figcaption></figure>
+  </div></div>
+  <div class="step"><div class="n">3</div><div class="b"><p>Click <b>Create and show key</b>. Copy the key that starts with <code>sfk_</code> with the <b>Copy</b> button. It is shown <b>once</b>; only a hash is stored. Click <b>I have stored it</b>.</p>
+    <figure class="narrow"><img src="assets/endpoint-key.png" alt="Ingest key created dialog, key masked"><figcaption><b>Figure 2.</b> The one-time key dialog (key masked in this manual).</figcaption></figure>
+  </div></div>
+  <p>Once a machine sends its first events, its source shows <b>Reporting</b> with an event count and the time of the last event:</p>
+  <figure><img src="assets/endpoint-sources.png" alt="Data sources panel with three reporting machines"><figcaption><b>Figure 3.</b> Three connected machines: a Windows workstation, an Ubuntu desktop and an Ubuntu server.</figcaption></figure>
+</section>
+
+<!-- ============================== 3 ============================== -->
+<section class="chapter">
+  <h2>3. Ubuntu Desktop</h2>
+  <p class="lead">Works on Ubuntu Desktop 20.04, 22.04, 24.04 and later (GNOME, and other desktops that use LightDM or SDDM). The installer sets everything up; you need the two files from <code>connectors/linux/</code> and the ingest key from chapter 2.</p>
+
+  <h3>3.1 Get the files onto the desktop</h3>
+  <p>Use whichever is easiest:</p>
+  <ul>
+    <li><b>USB stick:</b> copy the <code>connectors\linux</code> folder from the repository to the stick, plug it into the Ubuntu desktop, and copy the folder to your home folder as <code>sentinelforge</code> using the Files app.</li>
+    <li><b>From a Windows PC over the network:</b> on the Ubuntu desktop install the SSH server once (<code>sudo apt install -y openssh-server</code>) and find its address with <code>hostname -I</code>. Then in PowerShell on the Windows PC:</li>
+  </ul>
+<pre>scp -r C:\path\to\sentinal-IR\connectors\linux  maya@192.168.1.50:~/sentinelforge</pre>
+
+  <h3>3.2 Install</h3>
+  <div class="step"><div class="n">1</div><div class="b"><p>Open <b>Terminal</b>: press <b>Ctrl + Alt + T</b>, or open <b>Show Apps</b> and search for “Terminal”.</p></div></div>
+  <div class="step"><div class="n">2</div><div class="b"><p>Run the installer and paste the ingest key when asked. Nothing appears while you paste; that is normal for secret input. Press <b>Enter</b>.</p>
+    <div class="term ubuntu"><div class="bar"><i></i><i></i><i></i><span>maya@ubuntu-desk-07: ~/sentinelforge</span></div>
+<pre><span class="p">maya@ubuntu-desk-07</span>:<span class="u">~</span>$ cd ~/sentinelforge
+<span class="p">maya@ubuntu-desk-07</span>:<span class="u">~/sentinelforge</span>$ sudo bash install.sh --api-url https://sentinelforge-api.kuinkel.com
+[sudo] password for maya:
+Ingest key for this host's data source (sfk_...):
+Running a first collection...
+2026-10-28T13:40:02Z read 1184 journal records, sent 9, 9 new events, 0 alerts raised
+sentinelforge-shipper.service: Deactivated successfully.
+Finished sentinelforge-shipper.service - Ship security events from the journal to SentinelForge IR.
+Installed. Events are sent every 5 minutes. Check: systemctl list-timers sentinelforge-shipper.timer</pre></div>
+    <p class="illus">Illustration of the expected output. “sent 9” means 9 of the journal records were security events SentinelForge uses.</p>
+  </div></div>
+
+  <h3>3.3 What the installer set up</h3>
+  <table>
+    <tr><th style="width:62mm">Item</th><th>Purpose</th></tr>
+    <tr><td><code>sentinelforge</code> system account</td><td>Runs the shipper. No password, no shell, no home, no sudo; member of <code>systemd-journal</code> only, so it can read logs and nothing else.</td></tr>
+    <tr><td><code>/opt/sentinelforge/</code></td><td>The shipper script.</td></tr>
+    <tr><td><code>/etc/sentinelforge/linux-shipper.env</code></td><td>API URL and ingest key, readable only by root and the shipper account.</td></tr>
+    <tr><td><code>sentinelforge-shipper.service</code> and <code>.timer</code></td><td>Runs every 5 minutes (and 2 minutes after boot), with systemd hardening.</td></tr>
+    <tr><td><code>/var/lib/sentinelforge/journal.cursor</code></td><td>Where it got to in the log, so nothing is sent twice or skipped.</td></tr>
+  </table>
+
+  <h3>3.4 Check it on the desktop</h3>
+  <p>Lock the screen (<b>Super + L</b>), type a wrong password once, then sign in properly. After the next run (up to 5 minutes) both appear in SentinelForge. Locally:</p>
+    <div class="term ubuntu"><div class="bar"><i></i><i></i><i></i><span>maya@ubuntu-desk-07: ~</span></div>
+<pre><span class="p">maya@ubuntu-desk-07</span>:<span class="u">~</span>$ systemctl list-timers sentinelforge-shipper.timer
+NEXT                        LEFT     LAST                        PASSED  UNIT                        ACTIVATES
+Tue 2026-10-28 13:50:31 UTC 3min 4s  Tue 2026-10-28 13:45:31 UTC 1min ago sentinelforge-shipper.timer sentinelforge-shipper.service
+<span class="p">maya@ubuntu-desk-07</span>:<span class="u">~</span>$ journalctl -u sentinelforge-shipper.service -n 1 -o cat --grep read
+2026-10-28T13:45:33Z read 214 journal records, sent 2, 2 new events, 0 alerts raised</pre></div>
+  <p class="illus">Illustration of the expected output.</p>
+  <div class="note"><b>Desktop sign-ins have no source IP</b>Because they happen at the keyboard, they are recorded for investigations but do not trigger the password-guessing rule, which needs a remote address.</div>
+  <figure><img src="assets/endpoint-events-desktop.png" alt="Events from ubuntu-desk-07"><figcaption><b>Figure 4.</b> Events → host <code>ubuntu-desk-07</code>: a failed and a successful desktop sign-in, a <code>sudo apt update</code>, and a failed <code>sudo</code> password.</figcaption></figure>
+</section>
+
+<!-- ============================== 4 ============================== -->
+<section class="chapter">
+  <h2>4. Ubuntu Server</h2>
+  <p class="lead">Works on Ubuntu Server 20.04 and later, including cloud images. The steps are the same as for the desktop, done over SSH.</p>
+
+  <h3>4.1 Copy the files and connect</h3>
+  <p>From the Windows PC that has the repository (PowerShell), copy the folder, then sign in to the server:</p>
+<pre>scp -r C:\path\to\sentinal-IR\connectors\linux  deploy@203.0.113.10:~/sentinelforge
+ssh deploy@203.0.113.10</pre>
+  <p>Using PuTTY or WinSCP instead works the same way: copy the two files into <code>~/sentinelforge</code> and open a session.</p>
+
+  <h3>4.2 Make sure the journal is kept on disk</h3>
+  <p>Standard installs keep it in <code>/var/log/journal</code>. Minimal and some cloud images keep it only in memory, so events from before a reboot would be lost:</p>
+<pre>ls -d /var/log/journal || { sudo mkdir -p /var/log/journal &amp;&amp; sudo systemctl restart systemd-journald; }</pre>
+
+  <h3>4.3 Install</h3>
+  <div class="term ubuntu"><div class="bar"><i></i><i></i><i></i><span>deploy@ubuntu-srv-01: ~/sentinelforge</span></div>
+<pre><span class="p">deploy@ubuntu-srv-01</span>:<span class="u">~</span>$ cd ~/sentinelforge &amp;&amp; ls
+install.sh  sentinelforge_linux_shipper.py
+<span class="p">deploy@ubuntu-srv-01</span>:<span class="u">~/sentinelforge</span>$ sudo bash install.sh --api-url https://sentinelforge-api.kuinkel.com
+Ingest key for this host's data source (sfk_...):
+Running a first collection...
+2026-10-28T13:41:10Z read 3907 journal records, sent 13, 13 new events, 3 alerts raised
+sentinelforge-shipper.service: Deactivated successfully.
+Finished sentinelforge-shipper.service - Ship security events from the journal to SentinelForge IR.
+Installed. Events are sent every 5 minutes. Check: systemctl list-timers sentinelforge-shipper.timer</pre></div>
+  <p class="illus">Illustration of the expected output.</p>
+  <p>To see exactly what would be sent without sending anything (useful on a new server):</p>
+<pre>sudo -u sentinelforge python3 /opt/sentinelforge/sentinelforge_linux_shipper.py --dry-run --lookback-minutes 30</pre>
+
+  <h3>4.4 Safe test: SSH password guessing</h3>
+  <p>From another computer, try a wrong password 6 times for a real account, then sign in correctly from the same computer:</p>
+<pre>ssh deploy@203.0.113.10      # enter a wrong password 6 times, then the right one</pre>
+  <p>Within 5 minutes an <b>SF-AUTH-001</b> alert appears. It shows the failures, the successful login and the source address:</p>
+  <figure><img src="assets/endpoint-alert-detail.png" alt="SF-AUTH-001 alert for deploy on ubuntu-srv-01"><figcaption><b>Figure 5.</b> The alert raised by the test: 7 failed SSH logins for <code>deploy</code> from one address, then a successful one.</figcaption></figure>
+  <div class="note"><b>Password logins only</b>If the server allows only SSH keys (<code>PasswordAuthentication no</code>, recommended), failed attempts are still recorded but this rule cannot fire because nobody can log in with a guessed password.</div>
+</section>
+
+<section class="chapter">
+  <h3 style="margin-top:0">4.5 What a connected server sends</h3>
+  <figure><img src="assets/endpoint-events-server.png" alt="Events from ubuntu-srv-01"><figcaption><b>Figure 6.</b> Events → host <code>ubuntu-srv-01</code>: SSH failures and the successful login, a new account <code>svc_backup2</code> created and added to <code>sudo</code> with the <code>sudo</code> commands that did it, and <code>rsyslog</code> stopping.</figcaption></figure>
+  <table>
+    <tr><th style="width:62mm">On the server</th><th>Shows up as</th></tr>
+    <tr><td>SSH <code>Failed password</code> / <code>Accepted password</code> / <code>publickey</code></td><td><code>auth.failure</code> / <code>auth.success</code> with the client address</td></tr>
+    <tr><td><code>sudo</code> command</td><td><code>process.start</code> with the full command line, parent <code>sudo</code></td></tr>
+    <tr><td><code>useradd</code>, <code>usermod -aG</code>, <code>gpasswd -a</code>, <code>adduser USER GROUP</code></td><td><code>iam.user_created</code>, <code>iam.group_member_added</code>; the <code>sudo</code> user who ran it is the actor</td></tr>
+    <tr><td><code>auditd</code>, <code>rsyslog</code>, <code>journald</code>, Wazuh, osquery, <code>ufw</code>, AppArmor, fail2ban, ClamAV stopped</td><td><code>service.stopped</code> (ignored during shutdown and reboot)</td></tr>
+  </table>
+  <div class="warn"><b>Not collected on Linux</b>Programs started without <code>sudo</code>, file access and network connections are not in the journal. They need <code>auditd</code> or an EDR agent, which this connector does not read yet.</div>
+</section>
+
+<!-- ============================== 5 ============================== -->
+<section class="chapter">
+  <h2>5. Windows workstations and servers</h2>
+  <p class="lead">Works on Windows 10, Windows 11 and Windows Server 2016 or later. A PowerShell script runs every 5 minutes as a scheduled task. Do these steps in <b>PowerShell as Administrator</b>: open Start, type “PowerShell”, right-click <b>Windows PowerShell</b> → <b>Run as administrator</b>.</p>
+
+  <h3>5.1 Turn on the auditing the detections need</h3>
+  <p>On a domain, set these in a Group Policy for the machines (<b>Computer Configuration → Policies → Windows Settings → Security Settings → Advanced Audit Policy Configuration</b>). On a single machine:</p>
+<pre>auditpol /set /subcategory:"Logon" /success:enable /failure:enable
+auditpol /set /subcategory:"Process Creation" /success:enable
+auditpol /set /subcategory:"User Account Management" /success:enable /failure:enable
+auditpol /set /subcategory:"Security Group Management" /success:enable
+auditpol /set /subcategory:"Other Object Access Events" /success:enable
+reg add "HKLM\Software\Microsoft\Windows\CurrentVersion\Policies\System\Audit" /v ProcessCreationIncludeCmdLine_Enabled /t REG_DWORD /d 1 /f</pre>
+  <p>“Other Object Access Events” records scheduled tasks being created (event 4698). The last line adds command lines to process events.</p>
+  <div class="note"><b>Optional but recommended: Sysmon</b>Install <a href="https://learn.microsoft.com/sysinternals/downloads/sysmon">Sysmon</a> with a community configuration (for example SwiftOnSecurity's or Olaf Hartong's). It adds LSASS access (credential dumping), Run-key writes (persistence), network connections and DNS queries. The shipper picks it up automatically and sends only LSASS access and Run-key events from those two high-volume types.</div>
+
+  <h3>5.2 Install the shipper</h3>
+  <div class="step"><div class="n">1</div><div class="b"><p>Copy <code>connectors\windows\Send-WindowsEvents.ps1</code> to <code>C:\SentinelForge\</code> on the machine.</p></div></div>
+  <div class="step"><div class="n">2</div><div class="b"><p>Store the ingest key (type <code>windows_security</code>, chapter 2) at machine level, so it never appears in the task's command line:</p>
+<pre>[Environment]::SetEnvironmentVariable("SENTINELFORGE_INGEST_KEY", "sfk_paste_your_key_here", "Machine")</pre></div></div>
+  <div class="step"><div class="n">3</div><div class="b"><p>Open a <b>new</b> Administrator PowerShell window (so it sees the key) and run the shipper once:</p>
+    <div class="term ps"><div class="bar"><span>Administrator: Windows PowerShell</span></div>
+<pre><span class="p">PS C:\WINDOWS\system32&gt;</span> powershell -NoProfile -ExecutionPolicy Bypass -File C:\SentinelForge\Send-WindowsEvents.ps1 -ApiUrl https://sentinelforge-api.kuinkel.com
+2026-10-28 13:42:15Z sent 214 events, 214 new, 2 alerts raised</pre></div>
+    <p class="illus">Illustration of the expected output. The first run reads the last 60 minutes.</p></div></div>
+  <div class="step"><div class="n">4</div><div class="b"><p>Schedule it every 5 minutes as SYSTEM:</p>
+<pre>$action  = New-ScheduledTaskAction -Execute "powershell.exe" -Argument '-NoProfile -ExecutionPolicy Bypass -File "C:\SentinelForge\Send-WindowsEvents.ps1" -ApiUrl https://sentinelforge-api.kuinkel.com'
+$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5)
+Register-ScheduledTask -TaskName "SentinelForge event shipper" -Action $action -Trigger $trigger -User "SYSTEM" -RunLevel Highest</pre>
+    <p>Check it in <b>Task Scheduler</b> → Task Scheduler Library → <b>SentinelForge event shipper</b>: “Last Run Result” should be <b>The operation completed successfully (0x0)</b>.</p></div></div>
+  <div class="warn"><b>Expected one-time alert</b>Because this task runs PowerShell, registering it raises one <b>SF-PERS-001 Suspicious scheduled task</b> alert for the machine. Close it as <b>benign positive</b>; it is SentinelForge noticing its own installation.</div>
+</section>
+
+<section class="chapter">
+  <h3 style="margin-top:0">5.3 What a connected Windows machine sends</h3>
+  <figure><img src="assets/endpoint-events-windows.png" alt="Events from fin-ws-014"><figcaption><b>Figure 7.</b> Events → host <code>fin-ws-014</code>: repeated RDP logon failures, a successful RDP logon from an external address, a scheduled task created, and an LSASS memory read seen by Sysmon.</figcaption></figure>
+  <table>
+    <tr><th style="width:30mm">Log</th><th style="width:34mm">Event IDs</th><th>Meaning</th></tr>
+    <tr><td>Security</td><td>4624, 4625</td><td>Logon success / failure, with the logon type (10 = Remote Desktop)</td></tr>
+    <tr><td>Security</td><td>4688, 4698</td><td>Process created (with command line); scheduled task created</td></tr>
+    <tr><td>Security</td><td>4720, 4728, 4732, 4756</td><td>Account created; added to a global / local / universal group</td></tr>
+    <tr><td>Security, System</td><td>1102, 104, 7036</td><td>Log cleared; service stopped (Event Log, Sysmon, Defender)</td></tr>
+    <tr><td>Sysmon</td><td>1, 3, 10, 13, 22</td><td>Process, network connection, LSASS access, Run-key write, DNS query</td></tr>
+  </table>
+</section>
+
+<!-- ============================== 6 ============================== -->
+<section class="chapter">
+  <h2>6. Verify: events and alerts</h2>
+  <p class="lead">After a machine's first run, check three places in SentinelForge.</p>
+  <ol>
+    <li><b>Settings → Data sources:</b> the machine shows <b>Reporting</b>, an event count and “last … ago” (Figure 3). A source that stays <b>Stale</b> has not delivered anything; see chapter 7.</li>
+    <li><b>Events:</b> type the host name in the <b>host</b> box and click <b>Apply</b> (Figures 4, 6, 7). Click any timestamp to see the full record, including the original log fields.</li>
+    <li><b>Alerts:</b> detections raised from the machines' events, newest first:</li>
+  </ol>
+  <figure><img src="assets/endpoint-alerts.png" alt="Alert queue with alerts from the three machines"><figcaption><b>Figure 8.</b> Alerts raised by the activity in this manual's examples: on the Ubuntu server, logging stopped, a new sudo account and SSH password guessing; on the Windows workstation, credential dumping, a suspicious scheduled task, RDP password guessing and an RDP logon from the internet.</figcaption></figure>
+  <p>Open an alert to see why it fired, the matching events and the rule's known false positives, then acknowledge, close with a decision, or escalate it to an incident.</p>
+</section>
+
+<!-- ============================== 7 ============================== -->
+<section class="chapter">
+  <h2>7. Operations and troubleshooting</h2>
+  <h3>Everyday tasks</h3>
+  <table>
+    <tr><th style="width:38mm">Task</th><th>Ubuntu</th><th>Windows</th></tr>
+    <tr><td>Run now</td><td><code>sudo systemctl start sentinelforge-shipper.service</code></td><td>Task Scheduler → right-click the task → Run</td></tr>
+    <tr><td>See the last runs</td><td><code>journalctl -u sentinelforge-shipper.service -n 20</code></td><td>Task Scheduler → History tab</td></tr>
+    <tr><td>Rotate the key</td><td>Settings → Rotate key, then <code>sudoedit /etc/sentinelforge/linux-shipper.env</code></td><td>Settings → Rotate key, then set <code>SENTINELFORGE_INGEST_KEY</code> again (5.2 step 2)</td></tr>
+    <tr><td>Re-send recent history</td><td><code>sudo rm /var/lib/sentinelforge/journal.cursor</code></td><td>Delete <code>C:\ProgramData\SentinelForge\windows-events.state</code></td></tr>
+    <tr><td>Uninstall</td><td><code>sudo bash install.sh --uninstall</code></td><td><code>Unregister-ScheduledTask "SentinelForge event shipper"</code>, delete <code>C:\SentinelForge</code>, and clear the key: <code>[Environment]::SetEnvironmentVariable("SENTINELFORGE_INGEST_KEY", $null, "Machine")</code></td></tr>
+  </table>
+  <p>Re-sending is safe: SentinelForge ignores events it already has. If the API cannot be reached, the shippers keep their place and catch up on the next run.</p>
+
+  <h3>Common problems</h3>
+  <table>
+    <tr><th style="width:58mm">Symptom</th><th>Cause and fix</th></tr>
+    <tr><td><code>HTTP 401: Missing or invalid ingest key</code></td><td>Wrong, rotated or revoked key. Copy a new one (Rotate key) and update the machine.</td></tr>
+    <tr><td><code>HTTP 429</code> / “Too many requests”</td><td>Rate limit per source (60 requests a minute). The shipper retries; persistent 429s mean several machines share one key: give each its own.</td></tr>
+    <tr><td><code>API unreachable</code> / timeout</td><td>Outbound HTTPS is blocked. Allow TCP 443 to <code>sentinelforge-api.kuinkel.com</code>; check a proxy.</td></tr>
+    <tr><td>Ubuntu: <code>journalctl failed</code></td><td>The account cannot read the journal. Re-run the installer, which adds <code>sentinelforge</code> to <code>systemd-journal</code>.</td></tr>
+    <tr><td>Ubuntu: runs fine but “sent 0”</td><td>No security events since the last run; normal on a quiet machine. Use <code>--dry-run --lookback-minutes 600</code> to see recent candidates.</td></tr>
+    <tr><td>Windows: “Set SENTINELFORGE_INGEST_KEY…”</td><td>The key was set in a window opened earlier, or for the user instead of the machine. Set it with <code>"Machine"</code> and open a new window.</td></tr>
+    <tr><td>Windows: no process command lines</td><td>The registry setting in 5.1 is missing; apply it and wait for new processes.</td></tr>
+    <tr><td>Windows: no scheduled-task or LSASS events</td><td>“Other Object Access Events” auditing is off, or Sysmon is not installed / not configured for events 10 and 13.</td></tr>
+    <tr><td>Source stays <b>Stale</b></td><td>Check the last run on the machine first; any HTTP error message names the problem.</td></tr>
+  </table>
+  <h3>Security checklist</h3>
+  <ul class="check">
+    <li>One data source and key per machine.</li>
+    <li>Keys only in the installer prompt (Ubuntu) or the machine environment variable (Windows).</li>
+    <li>Rotate a machine's key when it is rebuilt, sold or given to someone else; revoke it when the machine is retired.</li>
+    <li>Close the shipper's own SF-PERS-001 alert on Windows as benign positive, once per machine.</li>
+    <li>Review new alerts daily; each one links to the events that caused it.</li>
+  </ul>
+</section>
+
+</body>
+</html>
