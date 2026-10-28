@@ -135,14 +135,12 @@ def _wrap(title: str, inner: str) -> str:
     )
 
 
-def _system_rows(user: User, facts: SystemFacts, invited_by: str | None) -> list[tuple[str, str]]:
+def _system_rows(user: User, facts: SystemFacts) -> list[tuple[str, str]]:
     rows = [
         ("Organisation", facts.organization),
         ("Your sign-in", user.email),
         ("Your role", f"{user.role}: {ROLE_SUMMARY.get(user.role, '')}"),
     ]
-    if invited_by:
-        rows.append(("Added by", invited_by))
     rows += [
         ("Sign-in address", f"{_base_url()}/login"),
         ("Platform", f"SentinelForge IR {facts.version} ({facts.environment})"),
@@ -154,9 +152,9 @@ def _system_rows(user: User, facts: SystemFacts, invited_by: str | None) -> list
     return rows
 
 
-def invite_email(user: User, facts: SystemFacts, temp_password: str, link: str, invited_by: str | None) -> Email:
+def invite_email(user: User, facts: SystemFacts, temp_password: str, link: str) -> Email:
     hours = get_settings().password_link_hours
-    rows = _system_rows(user, facts, invited_by)
+    rows = _system_rows(user, facts)
     subject = f"You have been added to SentinelForge IR ({facts.organization})"
     html = _wrap(
         subject,
@@ -186,15 +184,14 @@ def invite_email(user: User, facts: SystemFacts, temp_password: str, link: str, 
     return Email(to=user.email, subject=subject, html=html, text=text)
 
 
-def reset_email(user: User, facts: SystemFacts, link: str, requested_by: str | None) -> Email:
+def reset_email(user: User, facts: SystemFacts, link: str) -> Email:
     hours = get_settings().password_link_hours
     subject = "Reset your SentinelForge IR password"
-    who = f" at the request of {requested_by}" if requested_by else ""
     rows = [("Organisation", facts.organization), ("Account", user.email), ("Sign-in address", f"{_base_url()}/login")]
     html = _wrap(
         subject,
         f'<h1 style="margin:0 0 12px;font-size:20px">Reset your password</h1>'
-        f'<p style="margin:0 0 16px;font-size:15px;line-height:1.5">Hello {escape(user.display_name)}, a password reset was issued for your account{escape(who)}. '
+        f'<p style="margin:0 0 16px;font-size:15px;line-height:1.5">Hello {escape(user.display_name)}, a password reset was issued for your account. '
         f"Use this one-time link to choose a new password. It expires in {hours} hours.</p>"
         f'<p style="margin:0 0 16px"><a href="{escape(link)}" style="{_STYLE_BUTTON}">Choose a new password</a></p>'
         '<p style="margin:0 0 8px;font-size:14px;line-height:1.5">Your current password keeps working until you use the link. '
@@ -204,7 +201,7 @@ def reset_email(user: User, facts: SystemFacts, link: str, requested_by: str | N
     )
     text = (
         f"Hello {user.display_name},\n\n"
-        f"A password reset was issued for your SentinelForge IR account{who}.\n"
+        f"A password reset was issued for your SentinelForge IR account.\n"
         f"Choose a new password with this one-time link (expires in {hours} hours):\n  {link}\n\n"
         "Your current password keeps working until you use the link. Setting a new password signs you out of every session.\n\n"
         + "\n".join(f"  {k}: {v}" for k, v in rows)

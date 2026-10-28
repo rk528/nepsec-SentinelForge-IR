@@ -66,6 +66,8 @@ class Settings(BaseSettings):
     # Without a key, invitations are not emailed and the admin is shown the temporary password once.
     resend_api_key: SecretStr | None = None
     mail_from: str = "SentinelForge IR <no-reply@kuinkel.com>"
+    # Optional monitored mailbox for replies; a real reply path also helps deliverability.
+    mail_reply_to: str | None = None
     mail_timeout_seconds: float = 10.0
     # Public URL of the frontend, used to build sign-in and password links in emails.
     app_base_url: str = "http://127.0.0.1:3000"

@@ -49,6 +49,7 @@ variable settings and a local, git-ignored `backend/.env`.
 | `RESEND_API_KEY` | optional: Resend API key with *Sending access*; enables welcome and password-reset emails (see [Email](#email-resend)) | Sensitive |
 | `MAIL_FROM` | sender, e.g. `SentinelForge IR <no-reply@kuinkel.com>`; the domain must be verified in Resend | Plain |
 | `APP_BASE_URL` | public frontend URL used in email links, e.g. `https://sentinelforge.kuinkel.com` | Plain |
+| `MAIL_REPLY_TO` | optional: a mailbox you read, used as Reply-To on onboarding and reset emails | Plain |
 
 4. Deploy, then check `https://<backend-domain>/api/v1/health` returns
    `{"status":"ok","database":"ok",...}`.

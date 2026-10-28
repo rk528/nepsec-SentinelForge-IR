@@ -44,12 +44,15 @@ def send_email(message: Email) -> SendResult:
     if not mail_configured():
         return SendResult(False, "Email is not configured (RESEND_API_KEY is not set)")
     assert settings.resend_api_key is not None
+    body = {"from": settings.mail_from, "to": [message.to], "subject": message.subject, "html": message.html, "text": message.text}
+    if settings.mail_reply_to:
+        body["reply_to"] = settings.mail_reply_to
     try:
         with httpx.Client(timeout=settings.mail_timeout_seconds, headers={"User-Agent": "SentinelForge-IR/0.1"}) as client:
             r = client.post(
                 RESEND_URL,
                 headers={"Authorization": f"Bearer {settings.resend_api_key.get_secret_value()}"},
-                json={"from": settings.mail_from, "to": [message.to], "subject": message.subject, "html": message.html, "text": message.text},
+                json=body,
             )
     except httpx.TimeoutException:
         return SendResult(False, "The email provider timed out")

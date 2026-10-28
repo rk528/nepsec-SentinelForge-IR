@@ -59,8 +59,10 @@ def test_invite_email_has_temp_password_link_and_system_info(api_for, outbox) ->
     assert "added to SentinelForge IR" in message.subject and "Acme SOC" in message.subject
     temp = _temp_password(message)
     validate_password_strength(temp)
-    for fact in ("integrated into the Acme SOC", "Your role: analyst", "Added by", "Detection rules: 11 active rules", "Session policy", "/login"):
+    for fact in ("integrated into the Acme SOC", "Your role: analyst", "Detection rules: 11 active rules", "Session policy", "/login"):
         assert fact in message.text, fact
+    # The administrator who added the account is not disclosed to the recipient.
+    assert "Added by" not in message.text and admin.user["email"] not in message.text and admin.user["email"] not in message.html
     assert temp in message.html and _token(message) in message.html
     actions = [e["action"] for e in admin.get("/api/v1/audit", params={"page_size": 50}).json()["items"]]
     assert "user.invite_emailed" in actions
@@ -173,6 +175,11 @@ def test_resend_client_request_and_errors(monkeypatch) -> None:
     request = seen[0]
     assert str(request.url) == mail.RESEND_URL and request.headers["authorization"] == "Bearer re_test_key"
     assert b'"to":["a@example.test"]' in request.content.replace(b" ", b"")
+    assert b"reply_to" not in request.content
+    monkeypatch.setenv("MAIL_REPLY_TO", "soc@example.test")
+    get_settings.cache_clear()
+    run(200, {"id": "def"})
+    assert b'"reply_to":"soc@example.test"' in seen[-1].content.replace(b" ", b"")
     bad = run(403, {"name": "validation_error", "message": "The example.test domain is not verified."})
     assert not bad.sent and "403" in bad.error and "not verified" in bad.error
     get_settings.cache_clear()

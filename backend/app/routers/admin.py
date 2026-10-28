@@ -141,7 +141,7 @@ def create_user(
     db.refresh(user)
 
     link = onboarding.password_link(token)
-    message = onboarding.invite_email(user, onboarding.system_facts(db, user), temp, link, f"{principal.display_name} ({principal.email})")
+    message = onboarding.invite_email(user, onboarding.system_facts(db, user), temp, link)
     return {"id": str(user.id), **_delivery(db, ctx, user, "user.invite", message, {"temporary_password": temp, "password_link": link})}
 
 
@@ -161,7 +161,7 @@ def send_password_reset(
     db.commit()
 
     link = onboarding.password_link(token)
-    message = onboarding.reset_email(user, onboarding.system_facts(db, user), link, f"{principal.display_name} ({principal.email})")
+    message = onboarding.reset_email(user, onboarding.system_facts(db, user), link)
     return _delivery(db, ctx, user, "user.password_reset", message, {"password_link": link})
 
 
