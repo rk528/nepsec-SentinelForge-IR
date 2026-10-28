@@ -116,7 +116,13 @@ class MeOut(BaseModel):
     org_name: str
     is_demo: bool
     must_change_password: bool = False
+    # Minimum severity for alert emails; None when they are off.
+    alert_email_severity: str | None = None
     csrf_token: str | None = None
+
+
+class NotificationPrefsIn(BaseModel):
+    alert_email_severity: Literal["critical", "high", "medium", "low"] | None
 
 
 # --- events -----------------------------------------------------------------

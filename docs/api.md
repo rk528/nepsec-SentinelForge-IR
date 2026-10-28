@@ -35,7 +35,8 @@ A user signed in with an emailed temporary password (`must_change_password: true
 | POST | `/auth/demo` | public, demo mode only | `{role: analyst\|lead\|viewer}`; seeds the demo on first use |
 | POST | `/auth/logout`, `/auth/logout-all` | any | Revokes this / all sessions |
 | POST | `/auth/password` | any non-demo user | Change own password (`current_password`, `new_password`); revokes the user's other sessions |
-| GET | `/auth/me` | any | Current user, including `must_change_password` |
+| GET | `/auth/me` | any | Current user, including `must_change_password` and `alert_email_severity` |
+| PATCH | `/auth/me/notifications` | any non-demo user | `{alert_email_severity: critical\|high\|medium\|low\|null}`: turn your own alert digest emails on (minimum severity) or off |
 | POST | `/auth/reset-password/check` | public | `{token}`: who a one-time link is for; 400 when invalid, used or expired. Rate limited |
 | POST | `/auth/reset-password` | public | `{token, new_password}`: sets the password, consumes the link and signs out every session. Rate limited |
 | GET | `/dashboard/summary?days=` | viewer | KPIs, trends, telemetry health |

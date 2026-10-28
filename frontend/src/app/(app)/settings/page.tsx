@@ -1,17 +1,17 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, FlaskConical, KeyRound, Mail, Play, Plus, Trash2 } from "lucide-react";
+import { BellRing, Copy, FlaskConical, KeyRound, Mail, Play, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import { ChangePasswordForm, PASSWORD_RULES } from "@/components/password-change";
 import { StatusDot, SyntheticBadge } from "@/components/ui/badges";
 import { ConfirmDialog, Dialog, useToast } from "@/components/ui/overlays";
-import { Button, EmptyState, ErrorState, Field, Input, KeyValue, PageHeader, Panel, Select, Skeleton } from "@/components/ui/primitives";
+import { Button, EmptyState, ErrorState, Field, Input, KeyValue, PageHeader, Panel, Select, Skeleton, cn } from "@/components/ui/primitives";
 import { ApiError, api } from "@/lib/api";
 import { formatDateTime, relativeTime } from "@/lib/format";
 import { useCan, useMe } from "@/lib/hooks";
-import type { DataSource, Role } from "@/lib/types";
+import type { DataSource, Me, Role } from "@/lib/types";
 
 interface SystemInfo {
   version: string;
@@ -309,6 +309,54 @@ function Scenarios({ orgIsDemo }: { orgIsDemo: boolean }) {
   );
 }
 
+const ALERT_EMAIL_OPTIONS = [
+  { value: "", label: "Off", hint: "No alert emails." },
+  { value: "critical", label: "Critical only", hint: "Only the most urgent alerts, such as credential dumping." },
+  { value: "high", label: "High and above", hint: "Recommended for responders: sign-in takeovers, new admins, persistence." },
+  { value: "medium", label: "Medium and above", hint: "Adds lower-confidence detections." },
+  { value: "low", label: "Everything", hint: "Every new alert, including low severity." },
+] as const;
+
+function AlertEmails({ emailConfigured }: { emailConfigured: boolean }) {
+  const { data: me } = useMe();
+  const qc = useQueryClient();
+  const toast = useToast();
+  const save = useMutation({
+    mutationFn: (severity: string) => api<Me>("/auth/me/notifications", { method: "PATCH", body: { alert_email_severity: severity || null } }),
+    onSuccess: (m) => {
+      qc.setQueryData(["me"], (old: Me | undefined) => (old ? { ...old, alert_email_severity: m.alert_email_severity } : m));
+      toast({ kind: "success", title: m.alert_email_severity ? "Alert emails on" : "Alert emails off" });
+    },
+    onError: (e) => toast({ kind: "error", title: "Not saved", description: errText(e) }),
+  });
+  const current = me?.alert_email_severity ?? "";
+  return (
+    <Panel
+      title={<span className="flex items-center gap-1.5"><BellRing className="size-3.5 text-accent" aria-hidden /> Alert emails</span>}
+      description={`New alerts are emailed to ${me?.email ?? "you"} as one digest, at most every 10 minutes, so a burst never floods your inbox.`}
+      id="alert-emails"
+    >
+      {!emailConfigured && <p className="mb-3 rounded-md border border-warn/30 bg-warn/10 px-3 py-2 text-xs text-warn">Email is not configured on this deployment, so nothing will be sent until an administrator sets RESEND_API_KEY.</p>}
+      <div role="radiogroup" aria-label="Alert emails" className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+        {ALERT_EMAIL_OPTIONS.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            role="radio"
+            aria-checked={current === o.value}
+            disabled={save.isPending}
+            onClick={() => current !== o.value && save.mutate(o.value)}
+            className={cn("rounded-lg border p-3 text-left transition-colors disabled:opacity-60", current === o.value ? "border-accent/60 bg-accent/10" : "border-line hover:bg-raised")}
+          >
+            <span className={cn("block text-sm font-medium", current === o.value ? "text-accent" : "text-fg")}>{o.label}</span>
+            <span className="mt-0.5 block text-xs text-muted">{o.hint}</span>
+          </button>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
 function ChangePassword() {
   return (
     <Panel title={<span className="flex items-center gap-1.5"><KeyRound className="size-3.5 text-accent" aria-hidden /> Change password</span>} description={`${PASSWORD_RULES} Every other session of yours is signed out.`} id="password">
@@ -363,6 +411,7 @@ export default function SettingsPage() {
         <DataSources />
         {sys.data && <Scenarios orgIsDemo={sys.data.organization.is_demo} />}
         {isAdmin && <Users />}
+        {me && !me.is_demo && sys.data && <AlertEmails emailConfigured={sys.data.email.configured} />}
         {me && !me.is_demo && <ChangePassword />}
       </div>
     </>

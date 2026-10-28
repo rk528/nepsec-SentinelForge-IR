@@ -8,11 +8,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app import audit, ratelimit
+from app.audit import RequestContext
 from app.config import get_settings
 from app.db import get_db
-from app.deps import Principal, client_ip, get_principal, request_context
+from app.deps import Principal, client_ip, get_ctx, get_principal, request_context
 from app.models import Organization, PasswordResetToken, User, UserSession
-from app.schemas import DemoLoginIn, LoginIn, MeOut, PasswordChangeIn, PasswordResetIn, PasswordTokenIn
+from app.schemas import DemoLoginIn, LoginIn, MeOut, NotificationPrefsIn, PasswordChangeIn, PasswordResetIn, PasswordTokenIn
 from app.security import hash_password, new_token, sha256_hex, validate_password_strength, verify_password
 from app.services import onboarding
 from app.services.demo import DEMO_SLUG, demo_org, seed_demo
@@ -53,6 +54,7 @@ def _me(user: User, org: Organization, csrf: str | None = None) -> MeOut:
         org_name=org.name,
         is_demo=user.is_demo,
         must_change_password=user.must_change_password,
+        alert_email_severity=user.alert_email_severity,
         csrf_token=csrf,
     )
 
@@ -223,4 +225,17 @@ def reset_password(body: PasswordResetIn, request: Request, db: Session = Depend
 def me(principal: Principal = Depends(get_principal), db: Session = Depends(get_db)) -> MeOut:
     user = db.get(User, principal.user_id)
     assert user is not None
+    return _me(user, user.organization)
+
+
+@router.patch("/me/notifications", response_model=MeOut)
+def update_notifications(body: NotificationPrefsIn, principal: Principal = Depends(get_principal), ctx: RequestContext = Depends(get_ctx), db: Session = Depends(get_db)) -> MeOut:
+    """Turn your own alert emails on (with a minimum severity) or off."""
+    if principal.is_demo:
+        raise HTTPException(status_code=403, detail="Demo accounts cannot receive email")
+    user = db.get(User, principal.user_id)
+    assert user is not None
+    user.alert_email_severity = body.alert_email_severity
+    audit.record(db, ctx, "user.notifications_updated", target_type="user", target_id=user.id, details={"alert_email_severity": body.alert_email_severity})
+    db.commit()
     return _me(user, user.organization)

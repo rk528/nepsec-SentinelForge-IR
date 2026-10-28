@@ -74,12 +74,15 @@ class Organization(Base):
     is_demo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     incident_seq: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = _created_at()
+    # When the last alert digest email went out; paces the sender (see migration 0005).
+    alert_email_sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class User(Base):
     __tablename__ = "users"
     __table_args__ = (
         _check("role", ROLES, "ck_users_role"),
+        CheckConstraint("alert_email_severity IN ('critical', 'high', 'medium', 'low')", name="ck_users_alert_email_severity"),
         Index("uq_users_email_lower", func.lower(text("email")), unique=True),
     )
 
@@ -98,6 +101,8 @@ class User(Base):
     removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # True while the account still uses an emailed temporary password (see migration 0003).
     must_change_password: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    # Minimum severity to receive alert emails for; NULL means alert emails are off (migration 0005).
+    alert_email_severity: Mapped[str | None] = mapped_column(String(16))
 
     organization: Mapped[Organization] = relationship(lazy="joined")
 
@@ -286,6 +291,7 @@ class Alert(Base):
         Index("ix_alerts_org_status_time", "org_id", "status", "last_seen"),
         Index("ix_alerts_org_rule", "org_id", "rule_id"),
         Index("ix_alerts_incident", "incident_id"),
+        Index("ix_alerts_pending_notification", "org_id", postgresql_where=text("notified_at IS NULL")),
     )
 
     id: Mapped[uuid.UUID] = _uuid_pk()
@@ -308,6 +314,9 @@ class Alert(Base):
     assignee_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
     created_at: Mapped[datetime] = _created_at()
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    # Set once the digest sender has handled this alert, whether or not anyone wanted it.
+    notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     rule: Mapped[DetectionRule] = relationship(lazy="raise")
 

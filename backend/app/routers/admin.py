@@ -23,7 +23,7 @@ from app.intel.providers import PROVIDERS
 from app.models import AuditLog, DataSource, Event, Organization, User
 from app.schemas import AuditOut, DataSourceCreateIn, EventIn, IngestIn, IngestOut, Page, UserCreateIn, UserRef, UserUpdateIn
 from app.security import hash_password, new_token, sha256_hex
-from app.services import demo, mail, onboarding
+from app.services import alert_mail, demo, mail, onboarding
 from app.services.ingest import ingest_events, purge_expired_logs
 from app.services.scenarios import SCENARIOS, scenario_metadata
 
@@ -401,6 +401,9 @@ def _ingest(request: Request, db: Session, src: DataSource, events: list[EventIn
         summary = run_detection(db, src.org_id, since=min(detectable), ctx=ctx)
         created, updated = summary.alerts_created, summary.alerts_updated
     purged = purge_expired_logs(db, src.org_id, get_settings().log_retention_days) if len(detectable) < len(events) else 0
+    if run:
+        # Queued alerts go out as one digest when the organisation is due; never fails the ingest.
+        alert_mail.send_pending(db, src.org_id)
     if purged:
         details = {**(details or {}), "expired_log_lines_deleted": purged}
     audit.record(db, ctx, "ingest.batch", target_type="data_source", target_id=src.id, details={"received": result.received, "inserted": result.inserted, **(details or {})})

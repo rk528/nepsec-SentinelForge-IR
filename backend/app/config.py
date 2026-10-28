@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     # they cannot fill the database; security events are kept. Lines linked to an alert
     # or incident are never deleted.
     log_retention_days: int = 3
+    # At most one alert digest email per organisation in this many minutes; alerts raised
+    # in between are collected into the next one.
+    alert_email_interval_minutes: int = 10
 
     # Rate limits (requests per window)
     login_rate_limit: int = 10

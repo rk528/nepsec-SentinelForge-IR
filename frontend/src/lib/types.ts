@@ -21,6 +21,7 @@ export interface Me {
   org_name: string;
   is_demo: boolean;
   must_change_password?: boolean;
+  alert_email_severity?: "critical" | "high" | "medium" | "low" | null;
   csrf_token?: string | null;
 }
 
