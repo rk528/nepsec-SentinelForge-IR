@@ -89,6 +89,14 @@ class PasswordChangeIn(BaseModel):
     new_password: str = Field(min_length=1, max_length=256)
 
 
+class PasswordTokenIn(BaseModel):
+    token: str = Field(min_length=16, max_length=128)
+
+
+class PasswordResetIn(PasswordTokenIn):
+    new_password: str = Field(min_length=1, max_length=256)
+
+
 class DemoLoginIn(BaseModel):
     role: Literal["analyst", "lead", "viewer"] = "analyst"
 
@@ -101,6 +109,7 @@ class MeOut(BaseModel):
     org_id: uuid.UUID
     org_name: str
     is_demo: bool
+    must_change_password: bool = False
     csrf_token: str | None = None
 
 
@@ -471,7 +480,6 @@ class UserCreateIn(BaseModel):
     email: Email
     display_name: str = Field(min_length=1, max_length=120)
     role: Role
-    password: str = Field(min_length=12, max_length=256)
 
 
 class UserUpdateIn(BaseModel):
@@ -482,6 +490,6 @@ class UserUpdateIn(BaseModel):
 class DataSourceCreateIn(BaseModel):
     name: str = Field(min_length=2, max_length=120)
     source_type: Literal[
-        "windows_security", "sysmon", "linux_auditd", "firewall", "dns", "proxy", "email_gateway", "edr", "microsoft_entra", "microsoft_defender", "fortigate", "custom"
+        "windows_security", "sysmon", "linux", "linux_auditd", "firewall", "dns", "proxy", "email_gateway", "edr", "microsoft_entra", "microsoft_defender", "fortigate", "custom"
     ]
     description: str | None = Field(default=None, max_length=2000)

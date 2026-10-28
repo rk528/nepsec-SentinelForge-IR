@@ -62,6 +62,15 @@ class Settings(BaseSettings):
     intel_cache_hours: int = 24
     intel_http_timeout_seconds: float = 8.0
 
+    # Transactional email (onboarding and password reset) through Resend (https://resend.com).
+    # Without a key, invitations are not emailed and the admin is shown the temporary password once.
+    resend_api_key: SecretStr | None = None
+    mail_from: str = "SentinelForge IR <no-reply@kuinkel.com>"
+    mail_timeout_seconds: float = 10.0
+    # Public URL of the frontend, used to build sign-in and password links in emails.
+    app_base_url: str = "http://127.0.0.1:3000"
+    password_link_hours: int = 24
+
     # Trust X-Forwarded-For from the hosting platform's proxy for client IPs.
     trust_proxy_headers: bool = True
 

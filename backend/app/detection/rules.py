@@ -166,6 +166,10 @@ class PrivilegedAccountCreated(Rule):
         "schema admins",
         "sudo",
         "wheel",
+        # Ubuntu: "admin" is the legacy sudo group; docker and lxd membership is root-equivalent.
+        "admin",
+        "docker",
+        "lxd",
         # Entra ID directory roles
         "global administrator",
         "privileged role administrator",
@@ -223,7 +227,7 @@ class SecurityLoggingTampered(Rule):
     ]
     attack_techniques = ["T1070.001", "T1562.001", "T1562.002"]
 
-    LOGGING_SERVICES = {"eventlog", "sysmon", "sysmon64", "auditd", "winlogbeat", "wazuh-agent", "osqueryd", "rsyslog"}
+    LOGGING_SERVICES = {"eventlog", "sysmon", "sysmon64", "auditd", "winlogbeat", "wazuh-agent", "osqueryd", "rsyslog", "syslog-ng", "systemd-journald"}
 
     def evaluate(self, events: list[EventView], ctx: DetectionContext) -> list[Match]:
         matches: list[Match] = []

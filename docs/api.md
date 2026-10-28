@@ -21,6 +21,10 @@ schema at `/api/v1/openapi.json`.
 
 Roles: `viewer` < `analyst` < `lead` < `admin`.
 
+A user signed in with an emailed temporary password (`must_change_password: true`) gets
+`403 Change your temporary password to continue` from every endpoint except `/auth/me`,
+`/auth/password`, `/auth/logout` and `/auth/logout-all`.
+
 ## Endpoints
 
 | Method | Path | Min role | Notes |
@@ -31,7 +35,9 @@ Roles: `viewer` < `analyst` < `lead` < `admin`.
 | POST | `/auth/demo` | public, demo mode only | `{role: analyst\|lead\|viewer}`; seeds the demo on first use |
 | POST | `/auth/logout`, `/auth/logout-all` | any | Revokes this / all sessions |
 | POST | `/auth/password` | any non-demo user | Change own password (`current_password`, `new_password`); revokes the user's other sessions |
-| GET | `/auth/me` | any | Current user |
+| GET | `/auth/me` | any | Current user, including `must_change_password` |
+| POST | `/auth/reset-password/check` | public | `{token}`: who a one-time link is for; 400 when invalid, used or expired. Rate limited |
+| POST | `/auth/reset-password` | public | `{token, new_password}`: sets the password, consumes the link and signs out every session. Rate limited |
 | GET | `/dashboard/summary?days=` | viewer | KPIs, trends, telemetry health |
 | GET/POST | `/incidents` | viewer / analyst | Filters: `q,status[],severity[],assignee_id,unassigned,tag,sort,order` |
 | GET/PATCH | `/incidents/{id}` | viewer / analyst | PATCH requires current `version` |
@@ -59,7 +65,8 @@ Roles: `viewer` < `analyst` < `lead` < `admin`.
 | POST | `/response-actions/{id}/cancel` | requester or lead | |
 | GET | `/audit` | lead | Search by action (supports `*`), actor, target, time |
 | GET | `/users` | viewer | Active users for assignment |
-| GET/POST/PATCH | `/admin/users[/{id}]` | admin (non-demo for writes) | |
+| GET/POST/PATCH | `/admin/users[/{id}]` | admin (non-demo for writes) | POST `{email, display_name, role}` generates a temporary password and emails it with a one-time set-password link and the workspace details. Returns `{id, email_sent, email_error}`; when the email was not sent it also returns `temporary_password` and `password_link` (shown once) |
+| POST | `/admin/users/{id}/send-reset` | admin, non-demo | Email a one-time password reset link; the current password keeps working until it is used. 5 per user per hour |
 | DELETE | `/admin/users/{id}` | admin, non-demo | Remove an account: sessions revoked, cannot sign in, hidden, email freed; history kept. Not yourself or the last admin |
 | GET/POST | `/data-sources` | viewer / admin | Creation returns the ingest key once |
 | POST | `/data-sources/{id}/rotate-key` | admin | Issue a new key (the old one stops working) |
@@ -69,6 +76,7 @@ Roles: `viewer` < `analyst` < `lead` < `admin`.
 | POST | `/scenarios/{id}/run` | analyst in demo org, else admin | Injects synthetic events |
 | GET | `/system` | viewer | Version, migration revision, integration status (no secrets) |
 | POST | `/ingest/events` | ingest key | See below |
+| POST | `/ingest/linux` | ingest key | Linux journal records from the shipper (`{"records": [journalctl -o json objects]}`), at most 500; see [connectors-linux.md](connectors-linux.md) |
 | POST | `/ingest/fortigate` | ingest key | FortiGate syslog lines from the relay (`{"logs": [...]}`); see [connectors-fortigate.md](connectors-fortigate.md) |
 | POST | `/ingest/microsoft/{format}` | ingest key | Native Microsoft JSON: `entra-signin`, `entra-audit`, `defender-alert`, `windows-event`; see [connectors-microsoft.md](connectors-microsoft.md) |
 

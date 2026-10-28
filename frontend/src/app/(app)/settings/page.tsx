@@ -1,9 +1,10 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, FlaskConical, KeyRound, Play, Plus, Trash2 } from "lucide-react";
+import { Copy, FlaskConical, KeyRound, Mail, Play, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
+import { ChangePasswordForm, PASSWORD_RULES } from "@/components/password-change";
 import { StatusDot, SyntheticBadge } from "@/components/ui/badges";
 import { ConfirmDialog, Dialog, useToast } from "@/components/ui/overlays";
 import { Button, EmptyState, ErrorState, Field, Input, KeyValue, PageHeader, Panel, Select, Skeleton } from "@/components/ui/primitives";
@@ -19,10 +20,13 @@ interface SystemInfo {
   migration_revision: string | null;
   organization: { name: string; is_demo: boolean };
   integrations: { name: string; configured: boolean }[];
+  email: { provider: string; configured: boolean; sender: string };
   session: { ttl_hours: number; idle_minutes: number };
   limits: { max_body_bytes: number; max_ingest_body_bytes: number; login_rate_limit: string };
 }
-interface AdminUser { id: string; email: string; display_name: string; role: Role; is_active: boolean; is_demo: boolean; created_at: string; last_login_at: string | null }
+interface AdminUser { id: string; email: string; display_name: string; role: Role; is_active: boolean; is_demo: boolean; created_at: string; last_login_at: string | null; must_change_password: boolean }
+interface Delivery { email_sent: boolean; email_error: string | null; temporary_password?: string; password_link?: string }
+interface Undelivered { title: string; email: string; error: string | null; temporaryPassword?: string; link?: string }
 interface Scenario { id: string; name: string; description: string; expected_rules: string[]; expected_decision: string }
 
 function errText(e: unknown) {
@@ -116,7 +120,7 @@ function DataSources() {
           <Field label="Name" htmlFor="ds-name"><Input id="ds-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} placeholder="e.g. FortiGate HQ" /></Field>
           <Field label="Type" htmlFor="ds-type">
             <Select id="ds-type" value={type} onChange={(e) => setType(e.target.value)}>
-              {["windows_security", "sysmon", "microsoft_entra", "microsoft_defender", "fortigate", "linux_auditd", "firewall", "dns", "proxy", "email_gateway", "edr", "custom"].map((t) => <option key={t} value={t}>{t}</option>)}
+              {["windows_security", "sysmon", "microsoft_entra", "microsoft_defender", "fortigate", "linux", "linux_auditd", "firewall", "dns", "proxy", "email_gateway", "edr", "custom"].map((t) => <option key={t} value={t}>{t}</option>)}
             </Select>
           </Field>
         </div>
@@ -142,13 +146,28 @@ function Users() {
   const { data: me } = useMe();
   const [open, setOpen] = useState(false);
   const [removing, setRemoving] = useState<AdminUser | null>(null);
-  const [form, setForm] = useState({ email: "", display_name: "", role: "analyst" as Role, password: "" });
+  const [undelivered, setUndelivered] = useState<Undelivered | null>(null);
+  const [form, setForm] = useState({ email: "", display_name: "", role: "analyst" as Role });
   const q = useQuery({ queryKey: ["admin-users"], queryFn: () => api<AdminUser[]>("/admin/users") });
   const refresh = () => qc.invalidateQueries({ queryKey: ["admin-users"] });
   const create = useMutation({
-    mutationFn: () => api("/admin/users", { method: "POST", body: form }),
-    onSuccess: () => { refresh(); setOpen(false); setForm({ email: "", display_name: "", role: "analyst", password: "" }); toast({ kind: "success", title: "User created" }); },
+    mutationFn: () => api<Delivery & { id: string }>("/admin/users", { method: "POST", body: form }),
+    onSuccess: (r) => {
+      refresh();
+      setOpen(false);
+      if (r.email_sent) toast({ kind: "success", title: "User created", description: `Welcome email with a temporary password and set-password link sent to ${form.email}.` });
+      else setUndelivered({ title: "User created, but the welcome email was not sent", email: form.email, error: r.email_error, temporaryPassword: r.temporary_password, link: r.password_link });
+      setForm({ email: "", display_name: "", role: "analyst" });
+    },
     onError: (e) => toast({ kind: "error", title: "User not created", description: errText(e) }),
+  });
+  const sendReset = useMutation({
+    mutationFn: (u: AdminUser) => api<Delivery>(`/admin/users/${u.id}/send-reset`, { method: "POST" }),
+    onSuccess: (r, u) => {
+      if (r.email_sent) toast({ kind: "success", title: "Password reset email sent", description: `${u.email} can choose a new password with the link for the next 24 hours.` });
+      else setUndelivered({ title: "Reset link created, but the email was not sent", email: u.email, error: r.email_error, link: r.password_link });
+    },
+    onError: (e) => toast({ kind: "error", title: "Reset not sent", description: errText(e) }),
   });
   const update = useMutation({
     mutationFn: ({ id, body }: { id: string; body: object }) => api(`/admin/users/${id}`, { method: "PATCH", body }),
@@ -178,6 +197,7 @@ function Users() {
                       <span className="truncate text-sm font-medium text-fg">{u.display_name}</span>
                       {self && <span className="rounded-md border border-line-strong px-1.5 py-0.5 text-xs text-muted">You</span>}
                       {!u.is_active && <span className="rounded-md border border-warn/40 bg-warn/10 px-1.5 py-0.5 text-xs text-warn">Deactivated</span>}
+                      {u.is_active && u.must_change_password && <span className="rounded-md border border-line-strong px-1.5 py-0.5 text-xs text-muted">Awaiting first sign-in</span>}
                     </div>
                     <p className="truncate text-xs text-muted">{u.email}</p>
                     <p className="text-xs text-muted">Last sign-in {relativeTime(u.last_login_at)}</p>
@@ -191,6 +211,9 @@ function Users() {
                   <Button size="sm" variant="secondary" className="w-28" disabled={locked || self} onClick={() => update.mutate({ id: u.id, body: { is_active: !u.is_active } })}>
                     {u.is_active ? "Deactivate" : "Reactivate"}
                   </Button>
+                  <Button size="sm" variant="ghost" icon={<Mail className="size-3.5" aria-hidden />} disabled={locked || !u.is_active || u.is_demo} loading={sendReset.isPending && sendReset.variables?.id === u.id} onClick={() => sendReset.mutate(u)} aria-label={`Send password reset email to ${u.display_name}`}>
+                    Reset password
+                  </Button>
                   <Button size="sm" variant="danger" icon={<Trash2 className="size-3.5" aria-hidden />} disabled={locked || self} onClick={() => setRemoving(u)} aria-label={`Remove ${u.display_name}`}>
                     Remove
                   </Button>
@@ -200,14 +223,13 @@ function Users() {
           })}
         </ul>
       )}
-      <Dialog open={open} onOpenChange={setOpen} title="Add user" description="Passwords need 12+ characters with upper and lower case letters and a digit. Share them out of band." footer={<Button variant="primary" loading={create.isPending} onClick={() => create.mutate()}>Create user</Button>}>
+      <Dialog open={open} onOpenChange={setOpen} title="Add user" description="SentinelForge generates a temporary password and emails it with a one-time link to set their own password (valid 24 hours), their role and workspace details." footer={<Button variant="primary" loading={create.isPending} onClick={() => create.mutate()}>Create and send welcome email</Button>}>
         <div className="space-y-4">
           <Field label="Email" htmlFor="u-email"><Input id="u-email" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
           <Field label="Display name" htmlFor="u-name"><Input id="u-name" value={form.display_name} onChange={(e) => setForm({ ...form, display_name: e.target.value })} /></Field>
           <Field label="Role" htmlFor="u-role">
             <Select id="u-role" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}>{["viewer", "analyst", "lead", "admin"].map((r) => <option key={r} value={r}>{r}</option>)}</Select>
           </Field>
-          <Field label="Initial password" htmlFor="u-pw"><Input id="u-pw" type="password" autoComplete="new-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></Field>
         </div>
       </Dialog>
       <ConfirmDialog
@@ -220,7 +242,36 @@ function Users() {
         loading={remove.isPending}
         onConfirm={() => removing && remove.mutate(removing.id)}
       />
+      <UndeliveredDialog value={undelivered} onClose={() => setUndelivered(null)} />
     </Panel>
+  );
+}
+
+function UndeliveredDialog({ value, onClose }: { value: Undelivered | null; onClose: () => void }) {
+  const toast = useToast();
+  const copy = (text: string) => { navigator.clipboard?.writeText(text); toast({ kind: "info", title: "Copied to clipboard" }); };
+  return (
+    <Dialog open={!!value} onOpenChange={(o) => !o && onClose()} title={value?.title ?? ""} description={`Share these with ${value?.email ?? "the user"} over a trusted channel. They are shown only once.`} footer={<Button variant="primary" onClick={onClose}>Done</Button>}>
+      {value?.error && <p className="mb-4 rounded-md border border-warn/30 bg-warn/10 px-3 py-2 text-sm text-warn">{value.error}</p>}
+      <div className="space-y-4">
+        {value?.temporaryPassword && (
+          <Field label="Temporary password (must be changed at first sign-in)" htmlFor="u-temp">
+            <div className="flex gap-2">
+              <Input id="u-temp" readOnly value={value.temporaryPassword} className="mono" onFocus={(e) => e.currentTarget.select()} />
+              <Button icon={<Copy className="size-3.5" aria-hidden />} onClick={() => copy(value.temporaryPassword ?? "")}>Copy</Button>
+            </div>
+          </Field>
+        )}
+        {value?.link && (
+          <Field label="One-time set-password link (24 hours)" htmlFor="u-link">
+            <div className="flex gap-2">
+              <Input id="u-link" readOnly value={value.link} className="mono" onFocus={(e) => e.currentTarget.select()} />
+              <Button icon={<Copy className="size-3.5" aria-hidden />} onClick={() => copy(value.link ?? "")}>Copy</Button>
+            </div>
+          </Field>
+        )}
+      </div>
+    </Dialog>
   );
 }
 
@@ -259,31 +310,9 @@ function Scenarios({ orgIsDemo }: { orgIsDemo: boolean }) {
 }
 
 function ChangePassword() {
-  const toast = useToast();
-  const empty = { current_password: "", new_password: "", confirm: "" };
-  const [form, setForm] = useState(empty);
-  const mismatch = form.confirm.length > 0 && form.confirm !== form.new_password;
-  const change = useMutation({
-    mutationFn: () => api("/auth/password", { method: "POST", body: { current_password: form.current_password, new_password: form.new_password } }),
-    onSuccess: () => { setForm(empty); toast({ kind: "success", title: "Password changed", description: "Your other sessions were signed out." }); },
-    onError: (e) => toast({ kind: "error", title: "Password not changed", description: errText(e) }),
-  });
   return (
-    <Panel title={<span className="flex items-center gap-1.5"><KeyRound className="size-3.5 text-accent" aria-hidden /> Change password</span>} description="12+ characters with upper and lower case letters and a digit. Every other session of yours is signed out." id="password">
-      <form
-        className="grid gap-3 md:grid-cols-3"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!mismatch && form.new_password) change.mutate();
-        }}
-      >
-        <Field label="Current password" htmlFor="pw-current"><Input id="pw-current" type="password" autoComplete="current-password" value={form.current_password} onChange={(e) => setForm({ ...form, current_password: e.target.value })} /></Field>
-        <Field label="New password" htmlFor="pw-new"><Input id="pw-new" type="password" autoComplete="new-password" value={form.new_password} onChange={(e) => setForm({ ...form, new_password: e.target.value })} /></Field>
-        <Field label="Repeat new password" htmlFor="pw-confirm" error={mismatch ? "Passwords do not match" : undefined}><Input id="pw-confirm" type="password" autoComplete="new-password" aria-invalid={mismatch} value={form.confirm} onChange={(e) => setForm({ ...form, confirm: e.target.value })} /></Field>
-        <div className="md:col-span-3">
-          <Button type="submit" variant="primary" loading={change.isPending} disabled={!form.current_password || !form.new_password || mismatch}>Change password</Button>
-        </div>
-      </form>
+    <Panel title={<span className="flex items-center gap-1.5"><KeyRound className="size-3.5 text-accent" aria-hidden /> Change password</span>} description={`${PASSWORD_RULES} Every other session of yours is signed out.`} id="password">
+      <ChangePasswordForm />
     </Panel>
   );
 }
@@ -322,6 +351,10 @@ export default function SettingsPage() {
                     <span className="inline-flex items-center gap-1.5 text-xs text-muted"><StatusDot className={i.configured ? "bg-ok" : "bg-subtle"} />{i.configured ? "Configured" : "Not configured"}</span>
                   </li>
                 ))}
+                <li className="flex items-center justify-between border-t border-line pt-2 text-sm">
+                  <span className="text-fg">Email ({sys.data.email.provider})</span>
+                  <span className="inline-flex items-center gap-1.5 text-xs text-muted"><StatusDot className={sys.data.email.configured ? "bg-ok" : "bg-subtle"} />{sys.data.email.configured ? `Sending as ${sys.data.email.sender}` : "Not configured"}</span>
+                </li>
               </ul>
             )}
             <p className="mt-3 text-xs text-subtle">Unconfigured providers are reported as such; the platform never invents results. Last checked {formatDateTime(new Date().toISOString())}.</p>

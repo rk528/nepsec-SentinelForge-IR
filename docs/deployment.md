@@ -46,6 +46,9 @@ variable settings and a local, git-ignored `backend/.env`.
 | `COOKIE_SECURE` | `true` | Plain |
 | `VIRUSTOTAL_API_KEY`, `ABUSEIPDB_API_KEY`, `OTX_API_KEY` | optional | Sensitive |
 | `NEPSECINTEL_API_KEY` | optional: an API key from NepSec Intel's Workspace page (needs a Pro or admin account there) | Sensitive |
+| `RESEND_API_KEY` | optional: Resend API key with *Sending access*; enables welcome and password-reset emails (see [Email](#email-resend)) | Sensitive |
+| `MAIL_FROM` | sender, e.g. `SentinelForge IR <no-reply@kuinkel.com>`; the domain must be verified in Resend | Plain |
+| `APP_BASE_URL` | public frontend URL used in email links, e.g. `https://sentinelforge.kuinkel.com` | Plain |
 
 4. Deploy, then check `https://<backend-domain>/api/v1/health` returns
    `{"status":"ok","database":"ok",...}`.
@@ -87,8 +90,34 @@ python -m alembic upgrade head
 python -m alembic current
 ```
 
+Migration `0003` (password onboarding) adds `users.must_change_password` and the
+`password_reset_tokens` table. Apply it before deploying the release that creates users with
+emailed temporary passwords.
+
 Migrations are additive in this release. Do not run `alembic downgrade` against production
 without a backup: it drops tables.
+
+## Email (Resend)
+
+Adding a user generates a temporary password and emails it with a one-time link to set a
+password (valid `PASSWORD_LINK_HOURS`, default 24), the user's role and workspace details.
+Admins can also email a reset link from Settings → Users. Without `RESEND_API_KEY` nothing is
+emailed: the admin is shown the temporary password and link once, to pass on themselves.
+
+1. Create an account at <https://resend.com> (free tier: 3,000 emails per month, 100 per day).
+2. **Domains → Add domain** → `kuinkel.com` (or a subdomain such as `mail.kuinkel.com`).
+   Add the DKIM, SPF (MX and TXT on the `send` subdomain) and optional DMARC records it shows
+   in Cloudflare DNS as **DNS only**, then click **Verify**.
+3. **API keys → Create** with *Sending access* restricted to that domain.
+4. Set `RESEND_API_KEY`, `MAIL_FROM` and `APP_BASE_URL` on the backend project and redeploy.
+5. Settings → Threat intelligence integrations shows *Email (Resend): Sending as ...*.
+
+Until the domain is verified, Resend only delivers to the account owner's own address from
+`onboarding@resend.dev`, which is enough to test the flow.
+
+Every send is audited (`user.invite_emailed`, `user.invite_email_failed`,
+`user.password_reset_emailed`, ...) with the provider message ID or the failure reason,
+never the password or link.
 
 ## Health checks
 

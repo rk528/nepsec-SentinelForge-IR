@@ -12,6 +12,7 @@ import { api } from "@/lib/api";
 import { useMe } from "@/lib/hooks";
 import type { Incident, Page } from "@/lib/types";
 
+import { ForcedPasswordChange } from "../password-change";
 import { SeverityBadge } from "../ui/badges";
 import { Kbd, Spinner, cn } from "../ui/primitives";
 import { Logo } from "./logo";
@@ -313,6 +314,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             <div className="grid place-items-center py-24">
               <Spinner label="Loading workspace" />
             </div>
+          ) : me?.must_change_password ? (
+            <ForcedPasswordChange />
           ) : (
             children
           )}

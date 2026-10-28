@@ -96,8 +96,31 @@ class User(Base):
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Set when an administrator removes the account (see migration 0002).
     removed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # True while the account still uses an emailed temporary password (see migration 0003).
+    must_change_password: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
 
     organization: Mapped[Organization] = relationship(lazy="joined")
+
+
+class PasswordResetToken(Base):
+    """One-time link for setting a password. Only the SHA-256 of the token is stored."""
+
+    __tablename__ = "password_reset_tokens"
+    __table_args__ = (
+        _check("purpose", ("invite", "reset"), "ck_password_reset_tokens_purpose"),
+        Index("ix_password_reset_tokens_user", "user_id"),
+    )
+
+    id: Mapped[uuid.UUID] = _uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    purpose: Mapped[str] = mapped_column(String(16), nullable=False)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = _created_at()
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    user: Mapped[User] = relationship(lazy="joined", foreign_keys=[user_id])
 
 
 class UserSession(Base):

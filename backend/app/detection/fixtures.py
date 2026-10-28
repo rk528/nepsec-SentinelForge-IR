@@ -158,6 +158,14 @@ CASES: dict[str, list[Case]] = {
             ],
         ),
         Case(
+            "ubuntu: useradd then usermod -aG sudo",
+            "malicious",
+            [
+                _ev(1, 0, "iam.user_created", host="ubuntu-srv-01", user_name="alice", target_user="svc_tmp"),
+                _ev(2, 1, "iam.group_member_added", host="ubuntu-srv-01", user_name="alice", target_user="svc_tmp", group_name="sudo"),
+            ],
+        ),
+        Case(
             "create then add to standard group",
             "benign",
             [

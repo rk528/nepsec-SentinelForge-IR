@@ -20,6 +20,7 @@ export interface Me {
   org_id: string;
   org_name: string;
   is_demo: boolean;
+  must_change_password?: boolean;
   csrf_token?: string | null;
 }
 

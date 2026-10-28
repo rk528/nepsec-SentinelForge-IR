@@ -14,6 +14,7 @@ from app import audit, ratelimit
 from app.audit import RequestContext
 from app.config import get_settings
 from app.connectors.fortigate import map_fortigate_payload
+from app.connectors.linux import map_linux_payload
 from app.connectors.microsoft import map_records
 from app.db import get_db
 from app.deps import Admin, Analyst, Lead, Principal, Viewer, get_ctx, request_context, require_non_demo
@@ -21,8 +22,8 @@ from app.detection.engine import run_detection
 from app.intel.providers import PROVIDERS
 from app.models import AuditLog, DataSource, Event, Organization, User
 from app.schemas import AuditOut, DataSourceCreateIn, EventIn, IngestIn, IngestOut, Page, UserCreateIn, UserRef, UserUpdateIn
-from app.security import hash_password, new_token, sha256_hex, validate_password_strength
-from app.services import demo
+from app.security import hash_password, new_token, sha256_hex
+from app.services import demo, mail, onboarding
 from app.services.ingest import ingest_events
 from app.services.scenarios import SCENARIOS, scenario_metadata
 
@@ -89,27 +90,79 @@ def admin_list_users(principal: Principal = Admin, db: Session = Depends(get_db)
             "is_demo": u.is_demo,
             "created_at": u.created_at.isoformat(),
             "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
+            "must_change_password": u.must_change_password,
         }
         for u in rows
     ]
 
 
+def _delivery(db: Session, ctx: RequestContext, user: User, action: str, message: mail.Email, fallback: dict[str, str]) -> dict[str, Any]:
+    """Send an onboarding/reset email after the account change is committed, and audit the outcome.
+
+    When the email cannot be sent, the secrets are returned to the administrator
+    once instead, so the account is never left unreachable.
+    """
+    result = mail.send_email(message)
+    audit.record(
+        db,
+        ctx,
+        f"{action}_emailed" if result.sent else f"{action}_email_failed",
+        target_type="user",
+        target_id=user.id,
+        details={"to": user.email, "provider_id": result.provider_id} if result.sent else {"to": user.email, "reason": result.error},
+    )
+    db.commit()
+    if result.sent:
+        return {"email_sent": True, "email_error": None}
+    return {"email_sent": False, "email_error": result.error, **fallback}
+
+
 @router.post("/admin/users", status_code=201)
 def create_user(
     body: UserCreateIn, principal: Principal = Admin, _: Principal = Depends(require_non_demo), ctx: RequestContext = Depends(get_ctx), db: Session = Depends(get_db)
-) -> dict[str, str]:
-    try:
-        validate_password_strength(body.password)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from None
+) -> dict[str, Any]:
+    """Create an account with a generated temporary password and email the user their onboarding details."""
     if db.execute(select(User.id).where(func.lower(User.email) == body.email.lower())).scalar_one_or_none():
         raise HTTPException(status_code=409, detail="A user with that email already exists")
-    user = User(org_id=principal.org_id, email=body.email.lower(), display_name=body.display_name, role=body.role, password_hash=hash_password(body.password))
+    temp = onboarding.temporary_password()
+    user = User(
+        org_id=principal.org_id,
+        email=body.email.lower(),
+        display_name=body.display_name,
+        role=body.role,
+        password_hash=hash_password(temp),
+        must_change_password=True,
+    )
     db.add(user)
     db.flush()
+    token = onboarding.issue_token(db, user, "invite", principal.user_id)
     audit.record(db, ctx, "user.created", target_type="user", target_id=user.id, details={"email": user.email, "role": user.role})
     db.commit()
-    return {"id": str(user.id)}
+    db.refresh(user)
+
+    link = onboarding.password_link(token)
+    message = onboarding.invite_email(user, onboarding.system_facts(db, user), temp, link, f"{principal.display_name} ({principal.email})")
+    return {"id": str(user.id), **_delivery(db, ctx, user, "user.invite", message, {"temporary_password": temp, "password_link": link})}
+
+
+@router.post("/admin/users/{user_id}/send-reset")
+def send_password_reset(
+    user_id: uuid.UUID, principal: Principal = Admin, _: Principal = Depends(require_non_demo), ctx: RequestContext = Depends(get_ctx), db: Session = Depends(get_db)
+) -> dict[str, Any]:
+    """Email the user a one-time link to choose a new password. Their current password keeps working until it is used."""
+    user = db.execute(select(User).where(User.id == user_id, User.org_id == principal.org_id, User.removed_at.is_(None))).scalar_one_or_none()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.is_demo or not user.is_active:
+        raise HTTPException(status_code=422, detail="Reactivate the account before sending a password reset")
+    ratelimit.hit(db, f"reset-mail:user:{user.id}", 5, 3600)
+    token = onboarding.issue_token(db, user, "reset", principal.user_id)
+    audit.record(db, ctx, "user.password_reset_issued", target_type="user", target_id=user.id, details={"email": user.email})
+    db.commit()
+
+    link = onboarding.password_link(token)
+    message = onboarding.reset_email(user, onboarding.system_facts(db, user), link, f"{principal.display_name} ({principal.email})")
+    return _delivery(db, ctx, user, "user.password_reset", message, {"password_link": link})
 
 
 @router.patch("/admin/users/{user_id}")
@@ -312,6 +365,21 @@ def ingest_fortigate(request: Request, payload: Any = Body(...), db: Session = D
     return out
 
 
+@router.post("/ingest/linux", response_model=IngestOut, tags=["ingestion"])
+def ingest_linux(request: Request, payload: Any = Body(...), db: Session = Depends(get_db), run_detection: bool = True) -> IngestOut:
+    """Linux journal records as sent by the Linux shipper: ``{"records": [journalctl -o json objects]}``.
+
+    Same ingest key as ``/ingest/events``; records that do not map are counted as skipped.
+    """
+    src = _ingest_source(request, db)
+    events, skipped = map_linux_payload(payload)
+    if len(events) + skipped > MAX_VENDOR_RECORDS:
+        raise HTTPException(status_code=413, detail=f"At most {MAX_VENDOR_RECORDS} records per request")
+    out = _ingest(request, db, src, events, run=run_detection, details={"format": "linux-journald", "skipped": skipped})
+    out.skipped = skipped
+    return out
+
+
 def _ingest_source(request: Request, db: Session) -> DataSource:
     auth = request.headers.get("authorization", "")
     if not auth.lower().startswith("bearer ") or not auth[7:].startswith("sfk_") or len(auth) > 200:
@@ -379,6 +447,7 @@ def system_info(principal: Principal = Viewer, db: Session = Depends(get_db)) ->
         "migration_revision": revision,
         "organization": {"name": org.name if org else None, "is_demo": bool(org and org.is_demo)},
         "integrations": [{"name": p.label, "configured": p.configured()} for p in PROVIDERS],
+        "email": {"provider": "Resend", "configured": mail.mail_configured(), "sender": s.mail_from},
         "session": {"ttl_hours": s.session_ttl_hours, "idle_minutes": s.session_idle_minutes},
         "limits": {
             "max_body_bytes": s.max_body_bytes,

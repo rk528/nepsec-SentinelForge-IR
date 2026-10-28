@@ -16,7 +16,7 @@ action is simulated.**
 
 | Area | Highlights |
 |---|---|
-| Ingestion | Authenticated per-source API keys, strict validation, idempotent fingerprints, 1 MiB / 500-event batches; native Microsoft formats (Entra ID sign-in and audit logs, Defender XDR alerts, Windows Security/Sysmon events) and FortiGate firewall logs, with ready-made shippers ([Microsoft](docs/connectors-microsoft.md), [FortiGate](docs/connectors-fortigate.md)) |
+| Ingestion | Authenticated per-source API keys, strict validation, idempotent fingerprints, 1 MiB / 500-event batches; native Microsoft formats (Entra ID sign-in and audit logs, Defender XDR alerts, Windows Security/Sysmon events) and FortiGate firewall logs and Linux journal events from Ubuntu Server and Desktop (SSH, sign-ins, sudo, account changes), with ready-made shippers ([Microsoft](docs/connectors-microsoft.md), [FortiGate](docs/connectors-fortigate.md), [Ubuntu/Linux](docs/connectors-linux.md)) |
 | Detection | Eleven documented rules (brute force, LOLBins, privileged account creation, log tampering, suspicious egress, phishing click, forwarded vendor alerts, LSASS credential dumping, scheduled task and Run key persistence, suspicious RDP) with labelled fixtures and an honest self-test (TP/FP/TN/FN, precision, recall, known misses) |
 | Alert triage | Dedup-safe alerts with rule rationale, false-positive notes and matching events; acknowledge, close with disposition, or escalate |
 | Incidents | Lifecycle state machine (New → Open → Investigating → Contained → Resolved → Closed, lead-only reopen), optimistic concurrency, merged timeline, append-only notes, hashed evidence with provenance |
@@ -24,7 +24,7 @@ action is simulated.**
 | Response | Seven playbooks; firewall block is simulated and needs approval from a *different* lead; internal addresses refused; idempotency keys |
 | ATT&CK | Coverage view with tested/untested/gap states, observed alerts and last test time, plus an explicit disclaimer |
 | Reporting | JSON, Markdown and print-to-PDF reports that quote analyst text verbatim and list limitations |
-| Governance | Role-based access (viewer, analyst, lead, admin), organisation isolation, append-only audit log enforced by a database trigger |
+| Governance | Role-based access (viewer, analyst, lead, admin), organisation isolation, append-only audit log enforced by a database trigger; new users get an emailed welcome with a temporary password, a one-time set-password link and their workspace details (Resend), and admins can email reset links |
 
 ## Architecture
 
@@ -78,7 +78,7 @@ extensions are skipped automatically on Windows for the same reason.
 ## Tests
 
 ```bash
-cd backend  && python -m pytest                    # 127 tests against real PostgreSQL
+cd backend  && python -m pytest                    # 145 tests against real PostgreSQL
 cd frontend && npm run lint && npm run typecheck && npm test   # 23 unit/component tests
 cd frontend && npm run test:e2e                    # 10 Playwright tests incl. axe WCAG scans
 ```
@@ -113,6 +113,7 @@ A five-minute walkthrough and three case studies: [docs/portfolio-demo.md](docs/
 | [testing.md](docs/testing.md) | Test suites and recorded results |
 | [connectors-microsoft.md](docs/connectors-microsoft.md) | Sending Entra ID, Defender and Windows logs |
 | [connectors-fortigate.md](docs/connectors-fortigate.md) | FortiGate syslog relay and FortiOS configuration |
+| [connectors-linux.md](docs/connectors-linux.md) | Ubuntu Server and Desktop: journal shipper, systemd timer, checks |
 | [Data Source Connection Manual (PDF)](docs/manual/SentinelForge-IR-Data-Source-Manual.pdf) | Full step-by-step guide for every log source, threat intel, verification and troubleshooting |
 | [deployment.md](docs/deployment.md) | Vercel + Neon setup, migrations, rollback |
 | [free-tier-limitations.md](docs/free-tier-limitations.md) | Verified limits and implications |

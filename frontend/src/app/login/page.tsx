@@ -120,7 +120,7 @@ function LoginForm() {
         </div>
       </div>
 
-      <p className="text-center text-xs text-balance text-muted">Accounts are created by your administrator. Sessions expire after 12 hours or 2 hours idle.</p>
+      <p className="text-center text-xs text-balance text-muted">Accounts are created by your administrator, who can also email you a password reset link. Sessions expire after 12 hours or 2 hours idle.</p>
     </div>
   );
 }

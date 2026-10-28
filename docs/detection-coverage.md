@@ -14,7 +14,7 @@ with no rule (gaps).
 |---|---|---|---|---|
 | SF-AUTH-001 | Successful sign-in after repeated failures (≥5 failures, same account + source, success within 10 min) | High / medium | `auth.failure`, `auth.success` with user and source IP | T1110, T1110.001, T1078 |
 | SF-PROC-001 | Suspicious process command line (encoded PowerShell, certutil download, remote mshta, rundll32 javascript, shadow-copy deletion, Office spawning interpreters) | High (critical for shadow deletion) / medium | `process.start` with command line and parent | T1059.001, T1027, T1105, T1218.005, T1218.011, T1204.002, T1490 |
-| SF-IAM-001 | New account added to a privileged group within 30 min | High / medium | `iam.user_created`, `iam.group_member_added` | T1136.001, T1136.002, T1098 |
+| SF-IAM-001 | New account added to a privileged group within 30 min (Windows, Entra ID roles, Linux `sudo`/`admin`/`wheel`/`docker`/`lxd`) | High / medium | `iam.user_created`, `iam.group_member_added` | T1136.001, T1136.002, T1098 |
 | SF-DEF-001 | Security logging cleared or stopped | High (critical when cleared) / high | `log.cleared`, `service.stopped` | T1070.001, T1562.001, T1562.002 |
 | SF-NET-001 | Suspicious outbound connection (non-standard port, ≥50 MiB upload, or watchlisted destination) | Medium (high on watchlist or multiple reasons) / low | `network.connection` with dst IP/port and bytes | T1571, T1041, T1071 |
 | SF-MAIL-001 | Emailed link visited by the recipient within 60 min | High / medium | `email.delivered` with URL/domain, `dns.query` or `proxy.request` with user | T1566.002, T1204.001 |
@@ -47,7 +47,7 @@ against its fixtures and stores the results. Results from 28 October 2026:
 |---|---|---|---|---|---|---|---|
 | SF-AUTH-001 | 2 | 0 | 3 | 1 | 1.00 | 0.67 | Pass (FN is a documented limitation) |
 | SF-PROC-001 | 4 | 0 | 3 | 1 | 1.00 | 0.80 | Pass (FN documented) |
-| SF-IAM-001 | 1 | 0 | 3 | 0 | 1.00 | 1.00 | Pass |
+| SF-IAM-001 | 2 | 0 | 3 | 0 | 1.00 | 1.00 | Pass |
 | SF-DEF-001 | 2 | 0 | 1 | 0 | 1.00 | 1.00 | Pass |
 | SF-NET-001 | 3 | 0 | 2 | 1 | 1.00 | 0.75 | Pass (FN documented) |
 | SF-MAIL-001 | 1 | 1 | 3 | 0 | 0.50 | 1.00 | Pass (FP documented) |

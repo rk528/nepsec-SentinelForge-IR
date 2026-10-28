@@ -23,6 +23,8 @@ from app.models import User, UserSession
 from app.security import constant_time_equals, role_at_least, sha256_hex
 
 UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+# The only endpoints a user signed in with a temporary password may call.
+PASSWORD_CHANGE_ALLOWED = {"/api/v1/auth/me", "/api/v1/auth/password", "/api/v1/auth/logout", "/api/v1/auth/logout-all"}
 
 
 @dataclass(frozen=True)
@@ -77,6 +79,9 @@ def get_principal(request: Request, db: Session = Depends(get_db)) -> Principal:
         header = request.headers.get("x-csrf-token", "")
         if not header or not constant_time_equals(sha256_hex(header), session.csrf_hash):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="CSRF token missing or invalid")
+
+    if user.must_change_password and request.url.path not in PASSWORD_CHANGE_ALLOWED:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Change your temporary password to continue")
 
     # Sliding idle timeout, written at most once a minute to limit DB writes.
     if now - session.last_seen_at > timedelta(minutes=1):

@@ -11,9 +11,10 @@ from app import audit, ratelimit
 from app.config import get_settings
 from app.db import get_db
 from app.deps import Principal, client_ip, get_principal, request_context
-from app.models import Organization, User, UserSession
-from app.schemas import DemoLoginIn, LoginIn, MeOut, PasswordChangeIn
+from app.models import Organization, PasswordResetToken, User, UserSession
+from app.schemas import DemoLoginIn, LoginIn, MeOut, PasswordChangeIn, PasswordResetIn, PasswordTokenIn
 from app.security import hash_password, new_token, sha256_hex, validate_password_strength, verify_password
+from app.services import onboarding
 from app.services.demo import DEMO_SLUG, demo_org, seed_demo
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -51,6 +52,7 @@ def _me(user: User, org: Organization, csrf: str | None = None) -> MeOut:
         org_id=org.id,
         org_name=org.name,
         is_demo=user.is_demo,
+        must_change_password=user.must_change_password,
         csrf_token=csrf,
     )
 
@@ -166,10 +168,53 @@ def change_password(body: PasswordChangeIn, request: Request, principal: Princip
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from None
     user.password_hash = hash_password(body.new_password)
+    user.must_change_password = False
+    # Outstanding invite/reset links would let whoever reads the mailbox override the new password.
+    db.execute(update(PasswordResetToken).where(PasswordResetToken.user_id == user.id, PasswordResetToken.used_at.is_(None)).values(used_at=datetime.now(UTC)))
     db.execute(
         update(UserSession).where(UserSession.user_id == user.id, UserSession.id != principal.session_id, UserSession.revoked_at.is_(None)).values(revoked_at=datetime.now(UTC))
     )
     audit.record(db, ctx, "auth.password_changed", target_type="user", target_id=user.id)
+    db.commit()
+    return Response(status_code=204)
+
+
+_INVALID_LINK = "This link is invalid or has expired. Ask your administrator to send a new one."
+
+
+@router.post("/reset-password/check")
+def check_reset_token(body: PasswordTokenIn, request: Request, db: Session = Depends(get_db)) -> dict[str, str]:
+    """Public: lets the set-password page greet the user before they choose a password."""
+    ratelimit.hit(db, f"reset:ip:{client_ip(request) or 'unknown'}", 30, 300)
+    row = onboarding.find_valid_token(db, body.token)
+    db.commit()
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_INVALID_LINK)
+    return {"email": row.user.email, "display_name": row.user.display_name, "purpose": row.purpose, "expires_at": row.expires_at.isoformat()}
+
+
+@router.post("/reset-password", status_code=204)
+def reset_password(body: PasswordResetIn, request: Request, db: Session = Depends(get_db)) -> Response:
+    """Public: set a password with a one-time link. The link is consumed and every session is signed out."""
+    ratelimit.hit(db, f"reset:ip:{client_ip(request) or 'unknown'}", 30, 300)
+    row = onboarding.find_valid_token(db, body.token)
+    if row is None:
+        db.commit()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=_INVALID_LINK)
+    try:
+        validate_password_strength(body.new_password)
+    except ValueError as exc:
+        db.commit()
+        raise HTTPException(status_code=422, detail=str(exc)) from None
+    user = row.user
+    now = datetime.now(UTC)
+    user.password_hash = hash_password(body.new_password)
+    user.must_change_password = False
+    row.used_at = now
+    db.execute(update(UserSession).where(UserSession.user_id == user.id, UserSession.revoked_at.is_(None)).values(revoked_at=now))
+    ctx = request_context(request)
+    ctx.org_id, ctx.user_id, ctx.actor_label = user.org_id, user.id, user.email
+    audit.record(db, ctx, "auth.password_reset", target_type="user", target_id=user.id, details={"purpose": row.purpose})
     db.commit()
     return Response(status_code=204)
 
