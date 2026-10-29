@@ -52,6 +52,7 @@ variable settings and a local, git-ignored `backend/.env`.
 | `MAIL_REPLY_TO` | optional: a mailbox you read, used as Reply-To on onboarding and reset emails | Plain |
 | `ALERT_EMAIL_INTERVAL_MINUTES` | optional, default `10`: at most one alert digest email per organisation in this many minutes | Plain |
 | `LOG_RETENTION_DAYS` | optional, default `3`: days to keep full-capture `system.log` lines before they are deleted | Plain |
+| `CONSOLE_ORIGINS` | the admin console's addresses, comma separated (`https://dhiic-ponbs.kuinkel.com,https://dhiic-ponbs.vercel.app`). User and data source administration answers only to a sign-in made there (`/api/v1/auth/console-login`, cookie `sf_console`); empty switches administration off | Plain |
 
 4. Deploy, then check `https://<backend-domain>/api/v1/health` returns
    `{"status":"ok","database":"ok",...}`.
