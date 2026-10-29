@@ -22,15 +22,21 @@ from sqlalchemy.orm import Session
 from app import audit
 from app.config import get_settings
 from app.models import Alert, Organization, User
+from app.services import email_layout as layout
 from app.services import mail
-from app.services.onboarding import _STYLE_BUTTON, _wrap
 
 log = logging.getLogger(__name__)
 
 SEVERITY_RANK = {"info": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
 SEVERITY_COLOUR = {"critical": "#b91c1c", "high": "#c2410c", "medium": "#a16207", "low": "#4b5563", "info": "#4b5563"}
+SEVERITY_FILL = {"critical": "#fee4e2", "high": "#ffedd5", "medium": "#fef3c7", "low": "#f2f4f7", "info": "#f2f4f7"}
 MAX_LISTED = 20
+CARDS = 8  # the first alerts are shown as cards, the rest as lines
 QUEUE_HOURS = 24  # alerts older than this when first seen by the sender are cleared, not emailed
+
+
+def _short(text: str, limit: int) -> str:
+    return text if len(text) <= limit else text[: limit - 1].rstrip() + "\u2026"
 
 
 def _app_url(path: str) -> str:
@@ -52,24 +58,55 @@ def digest_email(user: User, org_name: str, alerts: list[Alert]) -> mail.Email:
     breakdown = ", ".join(f"{counts[s]} {s}" for s in ("critical", "high", "medium", "low", "info") if s in counts)
     subject = f"[SentinelForge] {len(alerts)} new alert{'s' if len(alerts) != 1 else ''} ({breakdown})"
 
-    rows = "".join(
-        '<tr><td style="padding:10px 0;border-top:1px solid #e5e7eb;vertical-align:top">'
-        f'<span style="display:inline-block;min-width:64px;font-size:12px;font-weight:700;text-transform:uppercase;color:{SEVERITY_COLOUR.get(a.severity, "#4b5563")}">{escape(a.severity)}</span></td>'
-        '<td style="padding:10px 0 10px 8px;border-top:1px solid #e5e7eb">'
-        f'<a href="{escape(_app_url(f"/alerts/{a.id}"))}" style="color:#111827;font-weight:600;text-decoration:none">{escape(a.title)}</a>'
-        f'<div style="font-size:12px;color:#6b7280;margin-top:2px">{escape(a.rule_id)}{" · " + escape(_entity_line(a)) if _entity_line(a) else ""}</div></td></tr>'
-        for a in shown
-    )
+    cards = [
+        (
+            f"sev-{a.severity}",
+            _short(a.title, 70),
+            _short(" · ".join(p for p in (a.rule_id, _entity_line(a)) if p), 44),
+            _app_url(f"/alerts/{a.id}"),
+            "View alert",
+        )
+        for a in shown[:CARDS]
+    ]
+    rest = shown[CARDS:]
     more = len(alerts) - len(shown)
-    html = _wrap(
-        subject,
-        f'<h1 style="margin:0 0 8px;font-size:20px">{len(alerts)} new alert{"s" if len(alerts) != 1 else ""} in {escape(org_name)}</h1>'
-        f'<p style="margin:0 0 12px;font-size:14px;color:#374151">Highest severity: <strong>{escape(worst)}</strong>. Open each alert to triage it; nothing has been acted on automatically.</p>'
-        f'<table role="presentation" style="border-collapse:collapse;width:100%;font-size:14px">{rows}</table>'
-        + (f'<p style="margin:8px 0 0;font-size:13px;color:#6b7280">and {more} more.</p>' if more else "")
-        + f'<p style="margin:20px 0 0"><a href="{escape(_app_url("/alerts?status=new"))}" style="{_STYLE_BUTTON}">Open the alert queue</a></p>'
-        f'<p style="margin:20px 0 0;font-size:12px;color:#6b7280">You get these because alert emails are on for {escape(user.email)} '
-        f"(severity {escape(user.alert_email_severity or '')} and above). Change or turn them off in Settings → Alert emails.</p>",
+    chips = "".join(
+        f'<span style="display:inline-block;margin:3px;padding:3px 10px;border-radius:999px;background:{SEVERITY_FILL.get(sev, "#f2f4f7")};'
+        f'color:{SEVERITY_COLOUR.get(sev, "#4b5563")};font-size:12px;font-weight:700;">{counts[sev]} {escape(sev)}</span>'
+        for sev in ("critical", "high", "medium", "low", "info", "informational")
+        if sev in counts
+    )
+    summary = layout.card(
+        layout.icon(f"sev-{worst}")
+        + f'<div style="margin-top:10px;font-size:30px;font-weight:700;line-height:1.1;color:{SEVERITY_COLOUR.get(worst, "#4b5563")};">{len(alerts)}</div>'
+        f'<div style="margin-top:4px;font-size:13.5px;color:#344054;">new alert{"s" if len(alerts) != 1 else ""} waiting for triage</div>'
+        f'<div style="margin-top:10px;">{chips}</div>'
+    )
+    listed = "".join(
+        f'<tr><td style="padding:10px 16px;{"" if i == 0 else "border-top:1px solid #eaecf0;"}">'
+        f'<span style="display:inline-block;min-width:64px;font-size:11px;font-weight:700;text-transform:uppercase;color:{SEVERITY_COLOUR.get(a.severity, "#4b5563")}">{escape(a.severity)}</span>'
+        f'<a href="{escape(_app_url(f"/alerts/{a.id}"))}" style="color:#101828;font-size:13.5px;font-weight:600;text-decoration:none">{escape(a.title)}</a></td></tr>'
+        for i, a in enumerate(rest)
+    )
+    body = layout.grid(cards)
+    if listed:
+        body += layout.section_title("More alerts") + (
+            '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;border:1px solid #e4e7ec;border-radius:12px;border-collapse:separate;">'
+            f"{listed}</table>"
+        )
+    if more:
+        body += f'<p style="margin:10px 0 0;font-size:13px;color:#667085;text-align:center;">and {more} more in the queue.</p>'
+    html = layout.page(
+        title=subject,
+        kind="Alert digest",
+        heading=f"{len(alerts)} new alert{'s' if len(alerts) != 1 else ''} in {org_name}",
+        lead=f"Highest severity: {worst}. Open each alert to triage it; nothing has been acted on automatically.",
+        top_html=summary,
+        body_html=body,
+        button_html=layout.button("Open the alert queue", _app_url("/alerts?status=new")),
+        footer=f"You get these because alert emails are on for {user.email} (severity {user.alert_email_severity or ''} and above). "
+        "Change or turn them off in Settings, Alert emails.",
+        preview=f"{len(alerts)} new alerts ({breakdown})",
     )
     text = "\n".join(
         [f"{len(alerts)} new alert(s) in {org_name} ({breakdown}).", ""]

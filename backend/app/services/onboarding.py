@@ -20,6 +20,7 @@ from app.config import get_settings
 from app.detection.rules import ALL_RULES
 from app.models import DataSource, PasswordResetToken, User
 from app.security import MIN_PASSWORD_LENGTH, new_token, sha256_hex
+from app.services import email_layout as layout
 from app.services.mail import Email
 
 ROLE_SUMMARY = {
@@ -107,31 +108,24 @@ def system_facts(db: Session, user: User) -> SystemFacts:
     )
 
 
-_STYLE_BODY = "margin:0;padding:24px;background:#f4f5f7;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#111827"
-_STYLE_CARD = "max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:28px"
-_STYLE_BUTTON = "display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:600;padding:11px 18px;border-radius:8px"
-_STYLE_CODE = (
-    "font-family:Consolas,Menlo,monospace;font-size:16px;letter-spacing:1px;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:8px 12px;display:inline-block"
+# Where a new account can start: (icon, name, what it does, page).
+START_HERE = (
+    ("alerts", "Alert queue", "Triage what the rules raised", "/alerts"),
+    ("incidents", "Incidents", "Investigate and respond", "/incidents"),
+    ("events", "Events", "Search every ingested log", "/events"),
+    ("playbooks", "Playbooks", "Step-by-step response", "/playbooks"),
+    ("intel", "Threat intel", "Look up IPs, domains, hashes", "/threat-intel"),
+    ("detections", "Detections", "Rules and their tests", "/detections"),
+    ("coverage", "ATT&CK coverage", "What is and is not covered", "/attack-coverage"),
+    ("reports", "Reports", "Evidence-backed write-ups", "/reports"),
 )
-_STYLE_TD_LABEL = "padding:6px 12px 6px 0;color:#6b7280;white-space:nowrap;vertical-align:top"
-_STYLE_TD = "padding:6px 0;color:#111827"
 
 
-def _table(rows: list[tuple[str, str]]) -> str:
-    cells = "".join(f'<tr><td style="{_STYLE_TD_LABEL}">{escape(k)}</td><td style="{_STYLE_TD}">{escape(v)}</td></tr>' for k, v in rows)
-    return f'<table role="presentation" style="border-collapse:collapse;font-size:14px;margin:8px 0 4px">{cells}</table>'
-
-
-def _wrap(title: str, inner: str) -> str:
-    return (
-        f'<!doctype html><html><head><meta charset="utf-8"><title>{escape(title)}</title></head>'
-        f'<body style="{_STYLE_BODY}"><div style="{_STYLE_CARD}">'
-        '<p style="margin:0 0 20px;font-weight:700;font-size:15px;color:#2563eb">SentinelForge IR</p>'
-        f"{inner}"
-        '<hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0 12px">'
-        '<p style="margin:0;font-size:12px;color:#6b7280">This is an automated message from SentinelForge IR. '
-        "We never ask for your password by email or phone. If you did not expect this message, contact your administrator.</p>"
-        "</div></body></html>"
+def _password_card(temp_password: str) -> str:
+    return layout.card(
+        layout.icon("key") + '<div style="margin-top:12px;font-size:13px;color:#667085;">Your temporary password</div>'
+        f'<div style="margin-top:6px;font:700 22px Consolas,Menlo,monospace;letter-spacing:1px;color:#1e1b4b;">{escape(temp_password)}</div>'
+        '<div style="margin-top:8px;font-size:12.5px;line-height:1.5;color:#667085;">You will be asked to replace it the first time you sign in. Do not share it.</div>'
     )
 
 
@@ -156,20 +150,24 @@ def invite_email(user: User, facts: SystemFacts, temp_password: str, link: str) 
     hours = get_settings().password_link_hours
     rows = _system_rows(user, facts)
     subject = f"You have been added to SentinelForge IR ({facts.organization})"
-    html = _wrap(
-        subject,
-        f'<h1 style="margin:0 0 12px;font-size:20px">Welcome, {escape(user.display_name)}</h1>'
-        f'<p style="margin:0 0 16px;font-size:15px;line-height:1.5">Your account has been created and you are now integrated into the '
-        f"<strong>{escape(facts.organization)}</strong> incident response workspace on SentinelForge IR.</p>"
-        '<h2 style="margin:20px 0 8px;font-size:15px">1. Set your password</h2>'
-        f'<p style="margin:0 0 12px;font-size:14px;line-height:1.5">Choose your own password with this one-time link. It expires in {hours} hours.</p>'
-        f'<p style="margin:0 0 16px"><a href="{escape(link)}" style="{_STYLE_BUTTON}">Set your password</a></p>'
-        '<h2 style="margin:20px 0 8px;font-size:15px">2. Or sign in with your temporary password</h2>'
-        f'<p style="margin:0 0 8px"><span style="{_STYLE_CODE}">{escape(temp_password)}</span></p>'
-        '<p style="margin:0 0 16px;font-size:13px;color:#6b7280">You will be asked to replace it the first time you sign in. Do not share it.</p>'
-        '<h2 style="margin:20px 0 4px;font-size:15px">Your access</h2>'
-        f"{_table(rows)}"
-        f'<p style="margin:12px 0 0;font-size:13px;color:#6b7280;word-break:break-all">If the button does not work, open: {escape(link)}</p>',
+    html = layout.page(
+        title=subject,
+        kind="Account",
+        heading=f"Welcome, {user.display_name}",
+        lead=f"Your account is ready: you are now part of the {facts.organization} incident response workspace on SentinelForge IR.",
+        top_html=_password_card(temp_password),
+        body_html=(
+            f'<p style="margin:16px 0 14px;font-size:13.5px;line-height:1.6;color:#475467;text-align:center;">Or choose your own password now. '
+            f"The link works once and expires in {hours} hours.</p>"
+            + layout.button("Set your password", link)
+            + f'<p style="margin:10px 0 0;font-size:12px;color:#98a2b3;word-break:break-all;text-align:center;">If the button does not work, open: {escape(link)}</p>'
+            + layout.section_title("Your access")
+            + layout.details(rows)
+            + layout.section_title("Where to start")
+            + layout.grid([(name, label, note, f"{_base_url()}{path}", "Open") for name, label, note, path in START_HERE])
+        ),
+        button_html=layout.button("Sign in to SentinelForge", f"{_base_url()}/login"),
+        footer="You get this email because an administrator of your organisation added you. If you did not expect it, contact your administrator.",
     )
     text_rows = "\n".join(f"  {k}: {v}" for k, v in rows)
     text = (
@@ -188,16 +186,21 @@ def reset_email(user: User, facts: SystemFacts, link: str) -> Email:
     hours = get_settings().password_link_hours
     subject = "Reset your SentinelForge IR password"
     rows = [("Organisation", facts.organization), ("Account", user.email), ("Sign-in address", f"{_base_url()}/login")]
-    html = _wrap(
-        subject,
-        f'<h1 style="margin:0 0 12px;font-size:20px">Reset your password</h1>'
-        f'<p style="margin:0 0 16px;font-size:15px;line-height:1.5">Hello {escape(user.display_name)}, a password reset was issued for your account. '
-        f"Use this one-time link to choose a new password. It expires in {hours} hours.</p>"
-        f'<p style="margin:0 0 16px"><a href="{escape(link)}" style="{_STYLE_BUTTON}">Choose a new password</a></p>'
-        '<p style="margin:0 0 8px;font-size:14px;line-height:1.5">Your current password keeps working until you use the link. '
-        "Setting a new password signs you out of every session.</p>"
-        f"{_table(rows)}"
-        f'<p style="margin:12px 0 0;font-size:13px;color:#6b7280;word-break:break-all">If the button does not work, open: {escape(link)}</p>',
+    html = layout.page(
+        title=subject,
+        kind="Security",
+        heading="Reset your password",
+        lead=f"Hello {user.display_name}, a password reset was issued for your account. Choose a new password with the button below.",
+        top_html=layout.card(
+            layout.icon("lock") + f'<div style="margin-top:12px;font-size:15px;font-weight:700;color:#101828;">The link works once and expires in {hours} hours</div>'
+            '<div style="margin-top:6px;font-size:13px;line-height:1.55;color:#667085;">Your current password keeps working until you use it. '
+            "Setting a new password signs you out of every session.</div>"
+        ),
+        body_html=layout.section_title("Account")
+        + layout.details(rows)
+        + f'<p style="margin:16px 0 0;font-size:12px;color:#98a2b3;word-break:break-all;text-align:center;">If the button does not work, open: {escape(link)}</p>',
+        button_html=layout.button("Choose a new password", link),
+        footer="You get this email because a reset was issued for your account. If you did not ask for it, contact your administrator.",
     )
     text = (
         f"Hello {user.display_name},\n\n"

@@ -32,7 +32,8 @@ def test_rule_metadata_is_complete(rule) -> None:
 
 
 def test_rule_ids_are_unique() -> None:
-    assert len(RULES_BY_ID) == len(ALL_RULES)
+    # Every detection, plus the rule hand-raised alerts belong to, which is never evaluated.
+    assert len(RULES_BY_ID) == len(ALL_RULES) + 1 and "SF-MAN-001" not in [r.id for r in ALL_RULES]
 
 
 def test_known_limitations_are_reported_not_hidden() -> None:

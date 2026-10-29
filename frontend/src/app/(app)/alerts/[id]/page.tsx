@@ -1,14 +1,15 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowUpRight, CheckCircle2, Siren } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, Link2, Siren, Unlink } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { EventList, JsonViewer } from "@/components/investigation";
+import { LinkEventsDialog } from "@/components/links";
 import { AlertStatusBadge, ConfidenceMeter, SeverityBadge, VERDICT_OPTIONS, VerdictBadge } from "@/components/ui/badges";
-import { Dialog, useToast } from "@/components/ui/overlays";
+import { ConfirmDialog, Dialog, useToast } from "@/components/ui/overlays";
 import { Button, ButtonLink, EmptyState, ErrorState, Field, KeyValue, PageHeader, Panel, Select, Skeleton, Textarea } from "@/components/ui/primitives";
 import { ApiError, api } from "@/lib/api";
 import { formatDateTime, humanize, relativeTime, utcTitle } from "@/lib/format";
@@ -134,6 +135,8 @@ export default function AlertDetailPage() {
   const qc = useQueryClient();
   const [escalating, setEscalating] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [linking, setLinking] = useState(false);
+  const [unlinking, setUnlinking] = useState(false);
   const q = useQuery({ queryKey: ["alert", id], queryFn: () => api<AlertDetail>(`/alerts/${id}`) });
   const ack = useMutation({
     mutationFn: () => api(`/alerts/${id}`, { method: "PATCH", body: { status: "acknowledged" } }),
@@ -143,6 +146,16 @@ export default function AlertDetailPage() {
       toast({ kind: "success", title: "Alert acknowledged" });
     },
     onError: (e) => toast({ kind: "error", title: "Could not acknowledge", description: e instanceof ApiError ? e.detail : undefined }),
+  });
+
+  const unlink = useMutation({
+    mutationFn: () => api(`/alerts/${id}/incident`, { method: "DELETE" }),
+    onSuccess: () => {
+      for (const key of ["alert", "alerts", "incident", "incidents"]) qc.invalidateQueries({ queryKey: [key] });
+      toast({ kind: "success", title: "Taken out of the incident" });
+      setUnlinking(false);
+    },
+    onError: (e) => toast({ kind: "error", title: "Not unlinked", description: e instanceof ApiError ? e.detail : undefined }),
   });
 
   if (q.isError) {
@@ -177,6 +190,14 @@ export default function AlertDetailPage() {
               {alert.status === "new" && (
                 <Button loading={ack.isPending} onClick={() => ack.mutate()} icon={<CheckCircle2 className="size-3.5" aria-hidden />}>
                   Acknowledge
+                </Button>
+              )}
+              <Button icon={<Link2 className="size-3.5" aria-hidden />} onClick={() => setLinking(true)}>
+                Link events
+              </Button>
+              {alert.incident_id && (
+                <Button icon={<Unlink className="size-3.5" aria-hidden />} onClick={() => setUnlinking(true)}>
+                  Remove from incident
                 </Button>
               )}
               {alert.status !== "closed" && !alert.incident_id && <Button onClick={() => setClosing(true)}>Close with decision</Button>}
@@ -226,7 +247,7 @@ export default function AlertDetailPage() {
               </p>
             )}
           </Panel>
-          <Panel title="Matching events" description="The exact events the rule evaluated. Select a timestamp to view the full record." bodyClassName="p-0" id="events">
+          <Panel title="Matching events" description="The events the rule matched, and any linked by an analyst. Select a timestamp to view the full record." bodyClassName="p-0" id="events">
             <EventList events={events} />
           </Panel>
         </div>
@@ -275,6 +296,16 @@ export default function AlertDetailPage() {
       </div>
       <EscalateDialog alert={alert} open={escalating} onOpenChange={setEscalating} />
       <TriageDialog alert={alert} open={closing} onOpenChange={setClosing} />
+      <LinkEventsDialog target="alerts" id={alert.id} exclude={events.map((e) => e.id)} open={linking} onOpenChange={setLinking} />
+      <ConfirmDialog
+        open={unlinking}
+        onOpenChange={setUnlinking}
+        title="Remove this alert from its incident?"
+        description="The alert goes back to acknowledged. The incident keeps the evidence already copied into it."
+        confirmLabel="Remove from incident"
+        loading={unlink.isPending}
+        onConfirm={() => unlink.mutate()}
+      />
     </>
   );
 }

@@ -7,6 +7,7 @@ import { useState } from "react";
 import { Dialog, useToast } from "@/components/ui/overlays";
 import { Button, Field, Input, Select, Textarea, cn } from "@/components/ui/primitives";
 import { ApiError, api } from "@/lib/api";
+import { PLAYBOOK_TEMPLATES } from "@/lib/playbook-templates";
 import type { CustomPlaybook, Playbook, PlaybookStep, RuleRow } from "@/lib/types";
 
 type Draft = { name: string; description: string; steps: PlaybookStep[]; trigger_rules: string[] };
@@ -73,6 +74,25 @@ export function PlaybookBuilder({ open, onOpenChange, editing }: { open: boolean
       }
     >
       <div className="space-y-4">
+        {!editing && (
+          <Field label="Start from a template" htmlFor="pb-template" hint="Fills in the steps for a common scenario. Change anything before saving.">
+            <Select
+              id="pb-template"
+              defaultValue=""
+              onChange={(e) => {
+                const t = PLAYBOOK_TEMPLATES.find((x) => x.id === e.target.value);
+                setDraft(t ? { name: t.name, description: t.description, trigger_rules: [...t.trigger_rules], steps: t.steps.map((st) => ({ ...st })) } : EMPTY);
+              }}
+            >
+              <option value="">Blank playbook</option>
+              {PLAYBOOK_TEMPLATES.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        )}
         <Field label="Name" htmlFor="pb-name">
           <Input id="pb-name" value={draft.name} maxLength={200} placeholder="e.g. Compromised account" onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
         </Field>

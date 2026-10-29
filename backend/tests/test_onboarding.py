@@ -152,7 +152,8 @@ def test_without_email_the_admin_sees_the_secrets_once(api_for) -> None:
 def test_names_are_escaped_in_html_email(api_for, outbox) -> None:
     admin = api_for("admin")
     _invite(admin, name='<img src=x onerror="alert(1)">')
-    assert "<img" not in outbox[0].html and "&lt;img" in outbox[0].html
+    # The layout's own pictures are the only images; the name is shown as text.
+    assert "<img src=x" not in outbox[0].html and "&lt;img src=x" in outbox[0].html
 
 
 def test_resend_client_request_and_errors(monkeypatch) -> None:

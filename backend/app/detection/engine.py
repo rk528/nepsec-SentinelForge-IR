@@ -16,7 +16,7 @@ from app import audit
 from app.audit import RequestContext
 from app.detection.base import DetectionContext, EventView, Match
 from app.detection.fixtures import CASES
-from app.detection.rules import ALL_RULES, MAX_LOOKBACK_MINUTES, RULES_BY_ID, Rule
+from app.detection.rules import ALL_RULES, MANUAL_RULE, MAX_LOOKBACK_MINUTES, RULES_BY_ID, Rule
 from app.models import Alert, AlertEvent, DetectionRule, DetectionTestRun, Event, Indicator
 
 # Full-capture log lines no rule reads; loading them would only slow every run down.
@@ -52,7 +52,7 @@ def to_view(e: Event) -> EventView:
 
 def sync_rule_metadata(db: Session) -> None:
     """Mirror rule metadata from code into the detection_rules table (keeps the enabled flag)."""
-    for rule in ALL_RULES:
+    for rule in [*ALL_RULES, MANUAL_RULE]:
         meta = rule.metadata()
         stmt = pg_insert(DetectionRule).values(**meta, enabled=True)
         stmt = stmt.on_conflict_do_update(

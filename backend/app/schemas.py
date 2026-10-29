@@ -284,6 +284,22 @@ class AlertEscalateIn(BaseModel):
     title: str | None = Field(default=None, max_length=300)
 
 
+class AlertCreateIn(BaseModel):
+    """An alert raised by hand: what it is about, how serious, and any events and incident it belongs with."""
+
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
+
+    title: str = Field(min_length=3, max_length=300)
+    description: str = Field(default="", max_length=10000)
+    severity: Severity
+    event_ids: list[uuid.UUID] = Field(default_factory=list, max_length=200)
+    incident_id: uuid.UUID | None = None
+
+
+class LinkAlertsIn(BaseModel):
+    alert_ids: list[uuid.UUID] = Field(min_length=1, max_length=100)
+
+
 class DetectionRunIn(BaseModel):
     hours: int = Field(default=24, ge=1, le=24 * 30)
 

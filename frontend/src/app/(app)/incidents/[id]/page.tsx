@@ -2,13 +2,14 @@
 
 import * as Tabs from "@radix-ui/react-tabs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowUpRight, Check, FileText, Pencil, Play, Search, ShieldQuestion, X } from "lucide-react";
+import { ArrowUpRight, BellPlus, Check, FileText, Link2, Pencil, Play, Search, ShieldQuestion, X } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { CustomPlaybookRuns } from "@/components/custom-runs";
 import { EventList, EvidenceList, Timeline } from "@/components/investigation";
+import { LinkAlertsDialog, LinkEventsDialog, RaiseAlertDialog } from "@/components/links";
 import {
   AlertStatusBadge,
   ConfidenceMeter,
@@ -566,6 +567,17 @@ export default function IncidentDetailPage() {
   const canTransition = useCan("analyst");
   const isLead = useCan("lead");
   const [target, setTarget] = useState<IncidentStatus | null>(null);
+  const [linking, setLinking] = useState<"alerts" | "events" | "raise" | null>(null);
+  const qc = useQueryClient();
+  const toast = useToast();
+  const unlinkEvent = useMutation({
+    mutationFn: (eventId: string) => api(`/incidents/${id}/events/${eventId}`, { method: "DELETE" }),
+    onSuccess: () => {
+      for (const key of ["incident", "event"]) qc.invalidateQueries({ queryKey: [key] });
+      toast({ kind: "success", title: "Event unlinked" });
+    },
+    onError: (e) => toast({ kind: "error", title: "Not unlinked", description: errText(e) }),
+  });
 
   const incident = useQuery({ queryKey: ["incident", id], queryFn: () => api<Incident>(`/incidents/${id}`) });
   const timeline = useQuery({ queryKey: ["incident", id, "timeline"], queryFn: () => api<TimelineItem[]>(`/incidents/${id}/timeline`), enabled: incident.isSuccess });
@@ -598,6 +610,8 @@ export default function IncidentDetailPage() {
   const inc = incident.data;
   // Reopening a closed incident is offered only to leads; the server enforces this too.
   const next = inc.status === "closed" && !isLead ? [] : TRANSITIONS[inc.status];
+  // Closed incidents are read-only; the server refuses changes too.
+  const canLink = canTransition && inc.status !== "closed";
 
   return (
     <>
@@ -659,16 +673,33 @@ export default function IncidentDetailPage() {
               {timeline.isError ? <ErrorState error={timeline.error} onRetry={() => timeline.refetch()} /> : !timeline.data ? <Skeleton className="my-4 h-40" /> : <Timeline items={timeline.data} />}
             </Tabs.Content>
             <Tabs.Content value="evidence">
-              <h3 className="px-4 pt-3 text-xs font-medium tracking-wide text-subtle uppercase">Supporting events</h3>
-              {!events.data ? <Skeleton className="m-4 h-24" /> : <EventList events={events.data} />}
+              <div className="flex items-center justify-between gap-2 px-4 pt-3">
+                <h3 className="text-xs font-medium tracking-wide text-subtle uppercase">Supporting events</h3>
+                {canLink && (
+                  <Button size="sm" icon={<Link2 className="size-3.5" aria-hidden />} onClick={() => setLinking("events")}>
+                    Link events
+                  </Button>
+                )}
+              </div>
+              {!events.data ? <Skeleton className="m-4 h-24" /> : <EventList events={events.data} onRemove={canLink ? (e) => unlinkEvent.mutate(e.id) : undefined} />}
               <h3 className="border-t border-line px-4 pt-3 text-xs font-medium tracking-wide text-subtle uppercase">Evidence records</h3>
               {!evidence.data ? <Skeleton className="m-4 h-24" /> : <EvidenceList items={evidence.data} />}
             </Tabs.Content>
             <Tabs.Content value="alerts">
+              {canLink && (
+                <div className="flex justify-end gap-2 border-b border-line px-4 py-2">
+                  <Button size="sm" icon={<Link2 className="size-3.5" aria-hidden />} onClick={() => setLinking("alerts")}>
+                    Link alerts
+                  </Button>
+                  <Button size="sm" icon={<BellPlus className="size-3.5" aria-hidden />} onClick={() => setLinking("raise")}>
+                    Raise alert
+                  </Button>
+                </div>
+              )}
               {!alerts.data ? (
                 <Skeleton className="m-4 h-24" />
               ) : alerts.data.length === 0 ? (
-                <EmptyState title="No alerts linked" description="Escalate alerts from the queue to link them here." />
+                <EmptyState title="No alerts linked" description="Link alerts from the queue here, escalate them from an alert, or raise one by hand." />
               ) : (
                 <ul className="divide-y divide-line">
                   {alerts.data.map((a) => (
@@ -723,6 +754,9 @@ export default function IncidentDetailPage() {
         <PropertiesRail incident={inc} />
       </div>
       <TransitionDialog key={target ?? "none"} incident={inc} target={target} onClose={() => setTarget(null)} />
+      <LinkAlertsDialog incidentId={inc.id} open={linking === "alerts"} onOpenChange={(o) => !o && setLinking(null)} />
+      <LinkEventsDialog target="incidents" id={inc.id} exclude={events.data?.map((e) => e.id)} open={linking === "events"} onOpenChange={(o) => !o && setLinking(null)} />
+      <RaiseAlertDialog incidentId={inc.id} open={linking === "raise"} onOpenChange={(o) => !o && setLinking(null)} />
     </>
   );
 }

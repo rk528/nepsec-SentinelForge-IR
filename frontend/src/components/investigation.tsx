@@ -78,7 +78,7 @@ export function EventDialog({ event, onClose }: { event: EventRecord | null; onC
   );
 }
 
-export function EventList({ events, empty = "No events linked." }: { events: EventRecord[]; empty?: string }) {
+export function EventList({ events, empty = "No events linked.", onRemove }: { events: EventRecord[]; empty?: string; onRemove?: (e: EventRecord) => void }) {
   const [open, setOpen] = useState<EventRecord | null>(null);
   if (events.length === 0) return <EmptyState title={empty} />;
   return (
@@ -93,6 +93,7 @@ export function EventList({ events, empty = "No events linked." }: { events: Eve
               <th scope="col" className="px-3 font-medium">Host</th>
               <th scope="col" className="hidden px-3 font-medium md:table-cell">Detail</th>
               <th scope="col" className="hidden pr-4 pl-3 font-medium lg:table-cell">Source</th>
+              {onRemove && <th scope="col" className="pr-4 font-medium"><span className="sr-only">Unlink</span></th>}
             </tr>
           </thead>
           <tbody>
@@ -107,6 +108,13 @@ export function EventList({ events, empty = "No events linked." }: { events: Eve
                 <td className="mono px-3 text-xs whitespace-nowrap text-fg">{e.host ?? "—"}</td>
                 <td className="mono hidden max-w-md truncate px-3 text-xs text-muted md:table-cell">{eventSubject(e) || e.message || "—"}</td>
                 <td className="hidden truncate pr-4 pl-3 text-xs text-subtle lg:table-cell">{e.data_source_name ?? "—"}</td>
+                {onRemove && (
+                  <td className="pr-4 text-right">
+                    <button type="button" onClick={() => onRemove(e)} className="text-xs text-muted hover:text-danger hover:underline">
+                      Unlink
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

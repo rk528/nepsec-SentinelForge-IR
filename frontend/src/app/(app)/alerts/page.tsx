@@ -2,7 +2,10 @@
 
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
-import { Suspense } from "react";
+import { Plus } from "lucide-react";
+import { Suspense, useState } from "react";
+
+import { RaiseAlertDialog } from "@/components/links";
 
 import { AlertStatusBadge, ConfidenceMeter, SeverityBadge } from "@/components/ui/badges";
 import { DataTable, Pagination, type Column } from "@/components/ui/data-table";
@@ -10,7 +13,7 @@ import { FilterChips, SearchBox, Toolbar } from "@/components/ui/filters";
 import { Button, EmptyState, ErrorState, PageHeader, Panel, Segmented, Select, SkeletonRows } from "@/components/ui/primitives";
 import { api } from "@/lib/api";
 import { relativeTime, utcTitle } from "@/lib/format";
-import { useUrlState } from "@/lib/hooks";
+import { useCan, useUrlState } from "@/lib/hooks";
 import { ALERT_STATUS_OPTIONS, SEVERITY_OPTIONS } from "@/lib/options";
 import type { Alert, Page, RuleRow } from "@/lib/types";
 
@@ -66,6 +69,8 @@ const RANGES = [
 
 function Alerts() {
   const url = useUrlState();
+  const canRaise = useCan("analyst");
+  const [raising, setRaising] = useState(false);
   const status = url.getAll("status");
   const severity = url.getAll("severity");
   const ruleIds = url.getAll("rule_id");
@@ -90,7 +95,16 @@ function Alerts() {
       <PageHeader
         title="Alert queue"
         description="Deduplicated detections awaiting triage. Each alert records the rule that fired and the events that matched."
-        actions={<Segmented label="Time range" value={rangeValue} options={RANGES} onChange={(v) => url.set({ hours: v || null })} />}
+        actions={
+          <>
+            <Segmented label="Time range" value={rangeValue} options={RANGES} onChange={(v) => url.set({ hours: v || null })} />
+            {canRaise && (
+              <Button variant="primary" icon={<Plus className="size-3.5" aria-hidden />} onClick={() => setRaising(true)}>
+                Raise alert
+              </Button>
+            )}
+          </>
+        }
       />
       <Panel bodyClassName="p-0">
         <Toolbar>
@@ -139,6 +153,7 @@ function Alerts() {
           </>
         )}
       </Panel>
+      <RaiseAlertDialog open={raising} onOpenChange={setRaising} />
     </>
   );
 }

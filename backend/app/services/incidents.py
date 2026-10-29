@@ -349,3 +349,40 @@ def build_timeline(db: Session, incident: Incident) -> list[dict[str, Any]]:
 
     items.sort(key=lambda i: i["at"])
     return items
+
+
+def open_requested_incidents(db: Session, ctx: RequestContext, org_id: uuid.UUID) -> int:
+    """Open an incident for each forwarded alert that asks for one and has none yet.
+
+    NepSec Intel asks this for its high attack surface findings (``open_incident`` in the alert's evidence). Only a new
+    alert gets one: an alert an analyst already acknowledged, closed or escalated is left to them.
+    """
+    asking = (
+        db.execute(
+            select(Alert)
+            .where(
+                Alert.org_id == org_id,
+                Alert.incident_id.is_(None),
+                Alert.status == "new",
+                Alert.evidence_summary["open_incident"].as_boolean().is_(True),
+            )
+            .with_for_update(skip_locked=True)
+        )
+        .scalars()
+        .all()
+    )
+    for alert in asking:
+        product = str(alert.evidence_summary.get("product") or "an integration")
+        create_incident(
+            db,
+            ctx,
+            org_id,
+            title=alert.title[:300],
+            summary=f"Opened on its own for a {alert.severity} alert forwarded by {product}. {alert.description}",
+            severity=alert.severity,
+            tags=sorted({"forwarded", product.lower().replace(" ", "-")[:64], str(alert.evidence_summary.get("kind") or "alert").lower()[:64]}),
+            source="integration",
+            created_by=None,
+            alerts=[alert],
+        )
+    return len(asking)

@@ -1,14 +1,18 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { BellPlus, Link2, Siren } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useState } from "react";
 
 import { EventList, JsonViewer, eventFields } from "@/components/investigation";
+import { AddEventToDialog, RaiseAlertDialog } from "@/components/links";
 import { SeverityBadge, SyntheticBadge } from "@/components/ui/badges";
-import { ButtonLink, EmptyState, ErrorState, KeyValue, PageHeader, Panel, Skeleton } from "@/components/ui/primitives";
+import { Button, ButtonLink, EmptyState, ErrorState, KeyValue, PageHeader, Panel, Skeleton } from "@/components/ui/primitives";
 import { ApiError, api } from "@/lib/api";
 import { formatDateTime, humanize } from "@/lib/format";
+import { useCan } from "@/lib/hooks";
 import type { EventRecord, Severity } from "@/lib/types";
 
 interface EventDetail {
@@ -20,6 +24,9 @@ interface EventDetail {
 
 export default function EventDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const canLink = useCan("analyst");
+  const [adding, setAdding] = useState<"alert" | "incident" | null>(null);
+  const [raising, setRaising] = useState(false);
   const q = useQuery({ queryKey: ["event", id], queryFn: () => api<EventDetail>(`/events/${id}`) });
   const related = useQuery({ queryKey: ["event", id, "related"], queryFn: () => api<EventRecord[]>(`/events/${id}/related`), enabled: q.isSuccess });
 
@@ -36,7 +43,23 @@ export default function EventDetailPage() {
   const { event, provenance, alerts, incidents } = q.data;
   return (
     <>
-      <PageHeader breadcrumbs={[{ label: "Events", href: "/events" }, { label: event.id.slice(0, 8) }]} title={humanize(event.event_type)} description={`${event.host ?? "Unknown host"} · ${formatDateTime(event.event_time)}`} meta={event.is_synthetic ? <SyntheticBadge /> : undefined} />
+      <PageHeader breadcrumbs={[{ label: "Events", href: "/events" }, { label: event.id.slice(0, 8) }]} title={humanize(event.event_type)} description={`${event.host ?? "Unknown host"} · ${formatDateTime(event.event_time)}`} meta={event.is_synthetic ? <SyntheticBadge /> : undefined}
+        actions={
+          canLink && (
+            <>
+              <Button icon={<Link2 className="size-3.5" aria-hidden />} onClick={() => setAdding("alert")}>
+                Add to alert
+              </Button>
+              <Button icon={<Siren className="size-3.5" aria-hidden />} onClick={() => setAdding("incident")}>
+                Add to incident
+              </Button>
+              <Button variant="primary" icon={<BellPlus className="size-3.5" aria-hidden />} onClick={() => setRaising(true)}>
+                Raise alert
+              </Button>
+            </>
+          )
+        }
+      />
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 space-y-4">
           <Panel title="Normalised fields" id="fields">
@@ -92,6 +115,8 @@ export default function EventDetailPage() {
           </Panel>
         </div>
       </div>
+      <AddEventToDialog key={adding ?? "none"} eventId={event.id} target={adding ?? "alert"} open={adding !== null} onOpenChange={(o) => !o && setAdding(null)} />
+      <RaiseAlertDialog open={raising} onOpenChange={setRaising} eventIds={[event.id]} />
     </>
   );
 }

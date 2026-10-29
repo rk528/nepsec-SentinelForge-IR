@@ -6,15 +6,17 @@ from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import case, func, or_, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
 from app import audit
 from app.audit import RequestContext
 from app.db import get_db
 from app.deps import Analyst, Principal, Viewer, get_ctx
-from app.detection.rules import RULES_BY_ID
-from app.models import Alert, AlertEvent, DataSource, DetectionRule, Event, Incident, User
-from app.schemas import AlertEscalateIn, AlertOut, AlertTriageIn, EventOut, Page
+from app.detection.engine import sync_rule_metadata
+from app.detection.rules import MANUAL_RULE, RULES_BY_ID
+from app.models import Alert, AlertEvent, DataSource, DetectionRule, Event, Incident, IncidentEvent, User
+from app.schemas import AlertCreateIn, AlertEscalateIn, AlertOut, AlertTriageIn, EventOut, LinkEventsIn, Page
 from app.services import incidents as inc_svc
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
@@ -75,6 +77,101 @@ def list_alerts(
     stmt = stmt.order_by(col.desc() if order == "desc" else col.asc(), Alert.last_seen.desc())
     rows = list(db.execute(stmt.offset((page - 1) * page_size).limit(page_size)).scalars())
     return Page(items=_out(db, rows), total=total, page=page, page_size=page_size)
+
+
+def _org_events(db: Session, principal: Principal, ids: set[uuid.UUID]) -> list[Event]:
+    found = list(db.execute(select(Event).where(Event.id.in_(ids), Event.org_id == principal.org_id)).scalars())
+    if len(found) != len(ids):
+        raise HTTPException(status_code=404, detail="One or more events were not found")
+    return found
+
+
+def _add_events(db: Session, principal: Principal, alert: Alert, events: list[Event], reason: str) -> list[uuid.UUID]:
+    """Link events to an alert, and to its incident when it has one. Returns the events that were not linked before."""
+    added = list(
+        db.execute(pg_insert(AlertEvent).values([{"alert_id": alert.id, "event_id": e.id} for e in events]).on_conflict_do_nothing().returning(AlertEvent.event_id)).scalars()
+    )
+    if added and alert.incident_id:
+        db.execute(
+            pg_insert(IncidentEvent)
+            .values([{"incident_id": alert.incident_id, "event_id": e, "added_by": principal.user_id, "reason": reason[:300]} for e in added])
+            .on_conflict_do_nothing()
+        )
+    if added:
+        times = [e.event_time for e in events if e.id in set(added)]
+        alert.first_seen = min([alert.first_seen, *times])
+        alert.last_seen = max([alert.last_seen, *times])
+        alert.updated_at = datetime.now(UTC)
+    return added
+
+
+@router.post("", response_model=AlertOut, status_code=201)
+def create_alert(body: AlertCreateIn, principal: Principal = Analyst, ctx: RequestContext = Depends(get_ctx), db: Session = Depends(get_db)) -> AlertOut:
+    """Raise an alert by hand, from events an analyst picked or from something no rule covers."""
+    events = _org_events(db, principal, set(body.event_ids)) if body.event_ids else []
+    incident = inc_svc.get_incident(db, principal, body.incident_id, lock=True) if body.incident_id else None
+    if incident is not None and incident.status == "closed":
+        raise HTTPException(status_code=409, detail="Cannot link to a closed incident")
+    sync_rule_metadata(db)  # the hand-raised rule's row must exist before an alert can name it
+    now = datetime.now(UTC)
+    times = sorted(e.event_time for e in events) or [now]
+    first = events[0] if events else None
+    entities = {k: v for k, v in {"host": first.host if first else None, "user": first.user_name if first else None, "src_ip": first.src_ip if first else None}.items() if v}
+    user = db.get(User, principal.user_id)
+    alert = Alert(
+        org_id=principal.org_id,
+        rule_id=MANUAL_RULE.id,
+        title=body.title,
+        description=body.description or "Raised by hand; no description was given.",
+        severity=body.severity,
+        confidence=MANUAL_RULE.confidence,
+        status="new",
+        dedup_key=f"{MANUAL_RULE.id}:{uuid.uuid4()}",
+        occurrence_count=max(len(events), 1),
+        first_seen=times[0],
+        last_seen=times[-1],
+        entities=entities,
+        evidence_summary={"raised_by": user.display_name if user else "an analyst", "method": "manual"},
+    )
+    db.add(alert)
+    db.flush()
+    if events:
+        _add_events(db, principal, alert, events, "Picked when the alert was raised")
+    audit.record(db, ctx, "alert.created", target_type="alert", target_id=alert.id, details={"rule_id": MANUAL_RULE.id, "manual": True, "event_count": len(events)})
+    if incident is not None:
+        inc_svc.link_alert(db, ctx, incident, alert)
+    db.commit()
+    return _out(db, [alert])[0]
+
+
+@router.post("/{alert_id}/events", status_code=201)
+def link_events(alert_id: uuid.UUID, body: LinkEventsIn, principal: Principal = Analyst, ctx: RequestContext = Depends(get_ctx), db: Session = Depends(get_db)) -> dict[str, int]:
+    """Link more events to an alert as its evidence. They go to its incident as well, when it has one."""
+    alert = _get_alert(db, principal, alert_id, lock=True)
+    events = _org_events(db, principal, set(body.event_ids))
+    added = _add_events(db, principal, alert, events, body.reason or f"Linked to alert {alert.title[:200]}")
+    if added:
+        audit.record(db, ctx, "alert.events_linked", target_type="alert", target_id=alert.id, details={"event_ids": [str(e) for e in added], "reason": body.reason})
+    db.commit()
+    return {"linked": len(added)}
+
+
+@router.delete("/{alert_id}/incident")
+def unlink_incident(alert_id: uuid.UUID, principal: Principal = Analyst, ctx: RequestContext = Depends(get_ctx), db: Session = Depends(get_db)) -> AlertOut:
+    """Take an alert out of its incident. It goes back to acknowledged; the incident keeps what was copied into it as evidence."""
+    alert = _get_alert(db, principal, alert_id, lock=True)
+    if alert.incident_id is None:
+        raise HTTPException(status_code=409, detail="This alert is not linked to an incident")
+    incident = inc_svc.get_incident(db, principal, alert.incident_id, lock=True)
+    if incident.status == "closed":
+        raise HTTPException(status_code=409, detail="Closed incidents are read-only; reopen first")
+    alert.incident_id = None
+    alert.status = "acknowledged"
+    alert.updated_at = datetime.now(UTC)
+    inc_svc.touch(incident)
+    audit.record(db, ctx, "incident.alert_unlinked", target_type="incident", target_id=incident.id, details={"alert_id": str(alert.id)})
+    db.commit()
+    return _out(db, [alert])[0]
 
 
 @router.get("/{alert_id}")

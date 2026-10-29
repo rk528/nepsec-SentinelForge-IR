@@ -45,11 +45,16 @@ A user signed in with an emailed temporary password (`must_change_password: true
 | POST | `/incidents/{id}/transition` | analyst (reopen: lead) | `{version,status,verdict?,closure_reason?,reason?}` |
 | GET/POST | `/incidents/{id}/notes` | viewer / analyst | Notes are append-only |
 | GET/POST | `/incidents/{id}/events` | viewer / analyst | Link events as evidence |
+| DELETE | `/incidents/{id}/events/{event_id}` | analyst | Unlink an event from the incident's evidence |
+| POST | `/incidents/{id}/alerts` | analyst | `{alert_ids}`: bring alerts in, with their events; an alert in another incident moves |
 | GET | `/incidents/{id}/alerts`, `/evidence`, `/timeline`, `/audit`, `/indicators` | viewer | |
 | GET | `/incidents/{id}/report?format=json\|markdown` | viewer | |
 | GET | `/alerts`, `/alerts/{id}` | viewer | Detail includes rule metadata and matching events |
 | PATCH | `/alerts/{id}` | analyst | Status, disposition (+reason), assignee |
 | POST | `/alerts/{id}/escalate` | analyst | New incident, or `{incident_id}` to link |
+| POST | `/alerts` | analyst | Raise an alert by hand: `{title, description, severity, event_ids?, incident_id?}`; rule `SF-MAN-001` |
+| POST | `/alerts/{id}/events` | analyst | `{event_ids, reason?}`: link more events; they go to its incident too |
+| DELETE | `/alerts/{id}/incident` | analyst | Take the alert out of its incident (back to acknowledged) |
 | GET | `/events`, `/events/{id}`, `/events/{id}/related` | viewer | `raw` is returned to analyst+ only |
 | GET | `/events/users?hours=&q=` | viewer | Accounts seen in the window with counts of commands, sign-ins, failures, account changes and devices, plus their hosts; drives the User activity page |
 | GET | `/detections` | viewer | Rules with latest self-test results |
@@ -112,6 +117,8 @@ Content-Type: application/json
 ```
 
 Response: `{"received", "inserted", "duplicates", "alerts_created", "alerts_updated"}`.
+
+NepSec Intel sends its attack surface findings as `security.alert` events with `raw.product = "NepSec Intel"`. Rule SF-EXT-001 keeps the severity it sends (`raw.severity`: critical, high, medium or low), and when `raw.open_incident` is true an incident is opened for the new alert straight away (source `integration`), once.
 
 Rules: 1–500 events per request, body up to 1 MiB, timestamps must include a timezone and may
 not be more than 5 minutes in the future, unknown fields are rejected, IPs are validated, and

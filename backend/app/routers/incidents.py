@@ -3,9 +3,9 @@ from __future__ import annotations
 import uuid
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import PlainTextResponse
-from sqlalchemy import case, false, func, or_, select
+from sqlalchemy import case, delete, false, func, or_, select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 
@@ -38,6 +38,7 @@ from app.schemas import (
     IncidentTransitionIn,
     IncidentUpdateIn,
     IndicatorOut,
+    LinkAlertsIn,
     LinkEventsIn,
     NoteIn,
     NoteOut,
@@ -277,6 +278,42 @@ def link_events(
         audit.record(db, ctx, "incident.events_linked", target_type="incident", target_id=inc.id, details={"event_ids": [str(e) for e in result], "reason": body.reason})
     db.commit()
     return {"linked": len(result)}
+
+
+@router.delete("/{incident_id}/events/{event_id}", status_code=204)
+def unlink_event(incident_id: uuid.UUID, event_id: uuid.UUID, principal: Principal = Analyst, ctx: RequestContext = Depends(get_ctx), db: Session = Depends(get_db)) -> Response:
+    """Take an event out of an incident's evidence. The event itself, and any alert it belongs to, are kept."""
+    inc = svc.get_incident(db, principal, incident_id, lock=True)
+    if inc.status == "closed":
+        raise HTTPException(status_code=409, detail="Closed incidents are read-only; reopen first")
+    gone = db.execute(delete(IncidentEvent).where(IncidentEvent.incident_id == inc.id, IncidentEvent.event_id == event_id)).rowcount
+    if not gone:
+        raise HTTPException(status_code=404, detail="That event is not linked to this incident")
+    svc.touch(inc)
+    audit.record(db, ctx, "incident.event_unlinked", target_type="incident", target_id=inc.id, details={"event_id": str(event_id)})
+    db.commit()
+    return Response(status_code=204)
+
+
+@router.post("/{incident_id}/alerts", status_code=201)
+def link_alerts(
+    incident_id: uuid.UUID, body: LinkAlertsIn, principal: Principal = Analyst, ctx: RequestContext = Depends(get_ctx), db: Session = Depends(get_db)
+) -> dict[str, int]:
+    """Bring alerts into an incident. Each one's events come with it as evidence, as when an alert is escalated."""
+    inc = svc.get_incident(db, principal, incident_id, lock=True)
+    if inc.status == "closed":
+        raise HTTPException(status_code=409, detail="Closed incidents are read-only; reopen first")
+    ids = set(body.alert_ids)
+    found = list(db.execute(select(Alert).where(Alert.id.in_(ids), Alert.org_id == principal.org_id).with_for_update()).scalars())
+    if len(found) != len(ids):
+        raise HTTPException(status_code=404, detail="One or more alerts were not found")
+    linked = 0
+    for alert in found:
+        if alert.incident_id != inc.id:
+            svc.link_alert(db, ctx, inc, alert)
+            linked += 1
+    db.commit()
+    return {"linked": linked}
 
 
 @router.get("/{incident_id}/alerts", response_model=list[AlertOut])

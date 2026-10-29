@@ -12,6 +12,7 @@ import hashlib
 import re
 from collections import defaultdict
 from datetime import timedelta
+from typing import Any
 
 from app.detection.base import DetectionContext, EventView, Match, Rule, is_external_ip, lower, of_type, raw_str
 
@@ -388,6 +389,9 @@ class MicrosoftSecurityAlert(Rule):
     external_attack_mapping = True
 
     SEVERITIES = {"high": "high", "medium": "medium"}
+    # NepSec Intel sends its own severity, and asks for an incident when a finding is serious enough to need one.
+    NEPSEC = "NepSec Intel"
+    NEPSEC_SEVERITIES = ("critical", "high", "medium", "low")
 
     def evaluate(self, events: list[EventView], ctx: DetectionContext) -> list[Match]:
         matches: list[Match] = []
@@ -396,6 +400,19 @@ class MicrosoftSecurityAlert(Rule):
             if severity is None:
                 continue
             title = e.message or "Microsoft security alert"
+            evidence: dict[str, Any] = {"microsoft_severity": e.outcome, "portal_url": e.url}
+            if e.raw.get("product") == self.NEPSEC:
+                if e.raw.get("severity") in self.NEPSEC_SEVERITIES:
+                    severity = e.raw["severity"]
+                evidence = {
+                    "product": self.NEPSEC,
+                    "kind": str(e.raw.get("kind") or "")[:40],
+                    "source_severity": e.raw.get("severity"),
+                    "link": str(e.raw.get("link") or "")[:500],
+                    "detail": str(e.raw.get("detail") or "")[:1000],
+                    "cves": [str(c)[:400] for c in (e.raw.get("cves") or [])[:20]] if isinstance(e.raw.get("cves"), list) else [],
+                    "open_incident": e.raw.get("open_incident") is True,
+                }
             matches.append(
                 Match(
                     rule_id=self.id,
@@ -407,7 +424,7 @@ class MicrosoftSecurityAlert(Rule):
                     first_seen=e.event_time,
                     last_seen=e.event_time,
                     entities={"host": e.host, "user": e.user_name, "src_ip": e.src_ip},
-                    evidence={"microsoft_severity": e.outcome, "portal_url": e.url},
+                    evidence=evidence,
                     severity=severity,
                 )
             )
@@ -704,6 +721,30 @@ ALL_RULES: list[Rule] = [
     SuspiciousRdpLogon(),
 ]
 
-RULES_BY_ID: dict[str, Rule] = {r.id: r for r in ALL_RULES}
+
+class AnalystRaised(Rule):
+    """Not a detection: the rule every alert raised by hand belongs to. It is never evaluated, tested or counted in coverage."""
+
+    id = "SF-MAN-001"
+    name = "Raised by an analyst"
+    description = "An alert an analyst raised by hand, from events they picked or from something seen outside the platform."
+    severity = "medium"
+    confidence = "high"
+    rationale = (
+        "Not every threat matches a rule. An analyst who sees something worth triage (a report from a user, a tip from another team, "
+        "events no rule covers) raises it here, so that it goes through the same queue, digest emails and escalation as detections."
+    )
+    required_telemetry = ["None: the analyst names the events, if any"]
+    false_positives = ["Whatever the analyst who raised it got wrong; the triage decision records it."]
+    attack_techniques: list[str] = []
+
+    def evaluate(self, events: list[EventView], ctx: DetectionContext) -> list[Match]:
+        return []
+
+
+MANUAL_RULE = AnalystRaised()
+
+# Every rule an alert can belong to, detections and the hand-raised one.
+RULES_BY_ID: dict[str, Rule] = {r.id: r for r in [*ALL_RULES, MANUAL_RULE]}
 
 MAX_LOOKBACK_MINUTES = max(r.lookback_minutes for r in ALL_RULES)
