@@ -57,8 +57,20 @@ def _unauthorized() -> HTTPException:
 
 
 def get_principal(request: Request, db: Session = Depends(get_db)) -> Principal:
+    return _principal(request, db, get_settings().session_cookie_name)
+
+
+def get_console_principal(request: Request, db: Session = Depends(get_db)) -> Principal:
+    """The administrator signed in to the admin console. The app's own session cookie does not count here."""
+    principal = _principal(request, db, get_settings().console_cookie_name)
+    if principal.role != "admin" or principal.is_demo:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requires admin role")
+    return principal
+
+
+def _principal(request: Request, db: Session, cookie_name: str) -> Principal:
     settings = get_settings()
-    token = request.cookies.get(settings.session_cookie_name)
+    token = request.cookies.get(cookie_name)
     if not token or len(token) > 128:
         raise _unauthorized()
 
@@ -130,7 +142,13 @@ def get_ctx(request: Request, principal: Principal = Depends(get_principal)) -> 
     return request_context(request, principal)
 
 
+def get_console_ctx(request: Request, principal: Principal = Depends(get_console_principal)) -> RequestContext:
+    return request_context(request, principal)
+
+
 Viewer = Depends(require_role("viewer"))
 Analyst = Depends(require_role("analyst"))
 Lead = Depends(require_role("lead"))
 Admin = Depends(require_role("admin"))
+# Administration of users and data sources: only from the admin console.
+ConsoleAdmin = Depends(get_console_principal)

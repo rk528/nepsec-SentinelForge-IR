@@ -130,8 +130,8 @@ def test_viewer_is_read_only_and_cannot_see_raw_events(api_for) -> None:
 
 def test_admin_only_operations(api_for) -> None:
     analyst = api_for("analyst")
-    assert analyst.post("/api/v1/data-sources", json={"name": "x1", "source_type": "dns"}).status_code == 403
-    assert analyst.post("/api/v1/admin/users", json={"email": "a@acme.test", "display_name": "A", "role": "admin", "password": "Another-strong-1pw"}).status_code == 403
+    assert analyst.post("/api/v1/data-sources", json={"name": "x1", "source_type": "dns"}).status_code == 401  # console only
+    assert analyst.post("/api/v1/admin/users", json={"email": "a@acme.test", "display_name": "A", "role": "admin", "password": "Another-strong-1pw"}).status_code == 401
 
 
 def test_ingest_requires_valid_key(app) -> None:
@@ -287,7 +287,7 @@ def test_admin_removes_user_and_email_is_freed(api_for, make_user, app) -> None:
     victim = make_user("analyst")
     other = Api(TestClient(app)).login(victim.email)
     assert admin.client.delete(f"/api/v1/admin/users/{victim.id}").status_code == 403  # CSRF required
-    r = admin.client.delete(f"/api/v1/admin/users/{victim.id}", headers={"X-CSRF-Token": admin.csrf})
+    r = admin.client.delete(f"/api/v1/admin/users/{victim.id}", headers={"X-CSRF-Token": admin.console_csrf})
     assert r.status_code == 204
     assert other.get("/api/v1/auth/me").status_code == 401  # sessions revoked
     assert TestClient(app).post("/api/v1/auth/login", json={"email": victim.email, "password": PASSWORD}).status_code == 401
@@ -303,11 +303,11 @@ def test_admin_removes_user_and_email_is_freed(api_for, make_user, app) -> None:
 def test_remove_user_guards(api_for, make_user) -> None:
     admin = api_for("admin")
     me = admin.user["id"]
-    assert admin.client.delete(f"/api/v1/admin/users/{me}", headers={"X-CSRF-Token": admin.csrf}).status_code == 422
+    assert admin.client.delete(f"/api/v1/admin/users/{me}", headers={"X-CSRF-Token": admin.console_csrf}).status_code == 422
     stranger = make_user("analyst", org="globex")
-    assert admin.client.delete(f"/api/v1/admin/users/{stranger.id}", headers={"X-CSRF-Token": admin.csrf}).status_code == 404
+    assert admin.client.delete(f"/api/v1/admin/users/{stranger.id}", headers={"X-CSRF-Token": admin.console_csrf}).status_code == 404
     analyst = api_for("analyst")
-    assert analyst.client.delete(f"/api/v1/admin/users/{stranger.id}", headers={"X-CSRF-Token": analyst.csrf}).status_code == 403
+    assert analyst.client.delete(f"/api/v1/admin/users/{stranger.id}", headers={"X-CSRF-Token": analyst.csrf}).status_code == 401
 
 
 def test_revoke_key_and_delete_source(api_for) -> None:
@@ -317,9 +317,9 @@ def test_revoke_key_and_delete_source(api_for) -> None:
     r = admin.post(f"/api/v1/data-sources/{src['id']}/revoke-key")
     assert r.status_code == 200 and r.json()["has_ingest_key"] is False
     assert ingest(admin.client, key, brute_force_events()).status_code == 401
-    assert admin.client.delete(f"/api/v1/data-sources/{src['id']}", headers={"X-CSRF-Token": admin.csrf}).status_code == 204
+    assert admin.client.delete(f"/api/v1/data-sources/{src['id']}", headers={"X-CSRF-Token": admin.console_csrf}).status_code == 204
     # A source that has stored events is kept as evidence.
     key2 = create_source(admin, "Busy source")
     assert ingest(admin.client, key2, brute_force_events()).status_code == 200
     busy = next(s for s in admin.get("/api/v1/data-sources").json() if s["name"] == "Busy source")
-    assert admin.client.delete(f"/api/v1/data-sources/{busy['id']}", headers={"X-CSRF-Token": admin.csrf}).status_code == 409
+    assert admin.client.delete(f"/api/v1/data-sources/{busy['id']}", headers={"X-CSRF-Token": admin.console_csrf}).status_code == 409

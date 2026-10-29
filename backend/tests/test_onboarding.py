@@ -134,7 +134,7 @@ def test_reset_is_admin_only_and_org_scoped(api_for, make_user, outbox) -> None:
     admin, analyst = api_for("admin"), api_for("analyst")
     stranger = make_user("analyst", org="other")
     member = make_user("viewer")
-    assert analyst.post(f"/api/v1/admin/users/{member.id}/send-reset").status_code == 403
+    assert analyst.post(f"/api/v1/admin/users/{member.id}/send-reset").status_code == 401  # not signed in to the console
     assert admin.post(f"/api/v1/admin/users/{stranger.id}/send-reset").status_code == 404
     assert outbox == []
 

@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     cookie_secure: bool = True
     session_cookie_name: str = "sf_session"
     csrf_cookie_name: str = "sf_csrf"
+    # The separate admin console: the addresses it is served from (comma separated) and the cookie its
+    # sign-in sets. Administration answers only to that cookie, which the app's own pages never hold.
+    console_origins: str = ""
+    console_cookie_name: str = "sf_console"
 
     # Comma separated list of origins allowed to call the API directly (CORS).
     # The frontend normally reaches the API through a same-origin rewrite, so
@@ -98,6 +102,10 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+
+    @property
+    def console_origin_list(self) -> list[str]:
+        return [o.strip().rstrip("/") for o in self.console_origins.split(",") if o.strip()]
 
     @property
     def is_production(self) -> bool:

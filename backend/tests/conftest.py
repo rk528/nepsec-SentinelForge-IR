@@ -39,6 +39,7 @@ os.environ.update(
         "COOKIE_SECURE": "false",
         "DEMO_MODE": "true",
         "TRUST_PROXY_HEADERS": "true",
+        "CONSOLE_ORIGINS": "https://console.test",
     }
 )
 for key in ("VIRUSTOTAL_API_KEY", "ABUSEIPDB_API_KEY", "OTX_API_KEY", "NEPSECINTEL_API_KEY", "DATABASE_URL_UNPOOLED"):
@@ -117,6 +118,8 @@ def make_user(db: Session):
 def api_for(app, make_user):
     def _api(role: str = "analyst", org: str = "acme") -> Api:
         user = make_user(role, org)
-        return Api(TestClient(app)).login(user.email)
+        api = Api(TestClient(app)).login(user.email)
+        # An administrator works user and data source administration from the admin console.
+        return api.console_login(user.email) if role == "admin" else api
 
     return _api

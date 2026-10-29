@@ -11,7 +11,7 @@ from app import audit, ratelimit
 from app.audit import RequestContext
 from app.config import get_settings
 from app.db import get_db
-from app.deps import Principal, client_ip, get_ctx, get_principal, request_context
+from app.deps import Principal, client_ip, get_console_principal, get_ctx, get_principal, request_context
 from app.models import Organization, PasswordResetToken, User, UserSession
 from app.schemas import DemoLoginIn, LoginIn, MeOut, NotificationPrefsIn, PasswordChangeIn, PasswordResetIn, PasswordTokenIn
 from app.security import hash_password, new_token, sha256_hex, validate_password_strength, verify_password
@@ -21,7 +21,7 @@ from app.services.demo import DEMO_SLUG, demo_org, seed_demo
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-def _start_session(db: Session, request: Request, response: Response, user: User) -> str:
+def _start_session(db: Session, request: Request, response: Response, user: User, console: bool = False) -> str:
     settings = get_settings()
     token, csrf = new_token(), new_token()
     now = datetime.now(UTC)
@@ -38,6 +38,10 @@ def _start_session(db: Session, request: Request, response: Response, user: User
     )
     user.last_login_at = now
     max_age = settings.session_ttl_hours * 3600
+    if console:
+        # The console keeps the CSRF token from the answer in memory; only the session goes in a cookie.
+        response.set_cookie(settings.console_cookie_name, token, max_age=max_age, httponly=True, secure=settings.cookie_secure, samesite="strict", path="/")
+        return csrf
     response.set_cookie(settings.session_cookie_name, token, max_age=max_age, httponly=True, secure=settings.cookie_secure, samesite="lax", path="/")
     # Readable by the SPA so it can echo the value in X-CSRF-Token.
     response.set_cookie(settings.csrf_cookie_name, csrf, max_age=max_age, httponly=False, secure=settings.cookie_secure, samesite="lax", path="/")
@@ -86,6 +90,41 @@ def login(body: LoginIn, request: Request, response: Response, db: Session = Dep
     audit.record(db, ctx, "auth.login", target_type="user", target_id=user.id)
     db.commit()
     return _me(user, user.organization, csrf)
+
+
+@router.post("/console-login", response_model=MeOut)
+def console_login(body: LoginIn, request: Request, response: Response, db: Session = Depends(get_db)) -> MeOut:
+    """Sign in to the admin console. Answers only to a request from the console's own address, and only for an administrator."""
+    settings = get_settings()
+    origin = (request.headers.get("origin") or "").rstrip("/")
+    if not origin or origin not in settings.console_origin_list:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    ip = client_ip(request) or "unknown"
+    ratelimit.hit(db, f"console-login:ip:{ip}", settings.login_rate_limit, settings.login_rate_window_seconds)
+    ratelimit.hit(db, f"login:acct:{body.email.lower()}", settings.login_rate_limit, settings.login_rate_window_seconds)
+    user = db.execute(select(User).where(func.lower(User.email) == body.email.lower())).scalar_one_or_none()
+    ok = verify_password(body.password, user.password_hash if user else None)
+    ctx = request_context(request)
+    if not ok or user is None or not user.is_active or user.is_demo or user.removed_at is not None or user.role != "admin":
+        audit.record(db, ctx, "auth.console_login_failed", target_type="user", details={"email": body.email.lower()}, org_id=user.org_id if user else None)
+        db.commit()
+        # The same answer for a wrong password and for someone who is not an administrator.
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password, or not an administrator")
+    csrf = _start_session(db, request, response, user, console=True)
+    ctx.org_id, ctx.user_id, ctx.actor_label = user.org_id, user.id, user.email
+    audit.record(db, ctx, "auth.console_login", target_type="user", target_id=user.id)
+    db.commit()
+    return _me(user, user.organization, csrf)
+
+
+@router.post("/console-logout", status_code=204)
+def console_logout(request: Request, response: Response, principal: Principal = Depends(get_console_principal), db: Session = Depends(get_db)) -> Response:
+    db.execute(update(UserSession).where(UserSession.id == principal.session_id).values(revoked_at=datetime.now(UTC)))
+    audit.record(db, request_context(request, principal), "auth.console_logout", target_type="user", target_id=principal.user_id)
+    db.commit()
+    response = Response(status_code=204)
+    response.delete_cookie(get_settings().console_cookie_name, path="/")
+    return response
 
 
 @router.post("/demo", response_model=MeOut)

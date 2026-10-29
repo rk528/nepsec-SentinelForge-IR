@@ -17,7 +17,7 @@ from app.connectors.fortigate import map_fortigate_payload
 from app.connectors.linux import map_linux_payload
 from app.connectors.microsoft import map_records
 from app.db import get_db
-from app.deps import Admin, Analyst, Lead, Principal, Viewer, get_ctx, request_context, require_non_demo
+from app.deps import Analyst, ConsoleAdmin, Lead, Principal, Viewer, get_console_ctx, get_ctx, request_context
 from app.detection.engine import PASSIVE_EVENT_TYPES, run_detection
 from app.intel.providers import PROVIDERS
 from app.models import AuditLog, DataSource, Event, Organization, User
@@ -79,7 +79,7 @@ def list_users(principal: Principal = Viewer, db: Session = Depends(get_db)) -> 
 
 
 @router.get("/admin/users")
-def admin_list_users(principal: Principal = Admin, db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+def admin_list_users(principal: Principal = ConsoleAdmin, db: Session = Depends(get_db)) -> list[dict[str, Any]]:
     rows = db.execute(select(User).where(User.org_id == principal.org_id, User.removed_at.is_(None)).order_by(User.created_at)).scalars()
     return [
         {
@@ -119,9 +119,7 @@ def _delivery(db: Session, ctx: RequestContext, user: User, action: str, message
 
 
 @router.post("/admin/users", status_code=201)
-def create_user(
-    body: UserCreateIn, principal: Principal = Admin, _: Principal = Depends(require_non_demo), ctx: RequestContext = Depends(get_ctx), db: Session = Depends(get_db)
-) -> dict[str, Any]:
+def create_user(body: UserCreateIn, principal: Principal = ConsoleAdmin, ctx: RequestContext = Depends(get_console_ctx), db: Session = Depends(get_db)) -> dict[str, Any]:
     """Create an account with a generated temporary password and email the user their onboarding details."""
     if db.execute(select(User.id).where(func.lower(User.email) == body.email.lower())).scalar_one_or_none():
         raise HTTPException(status_code=409, detail="A user with that email already exists")
@@ -147,9 +145,7 @@ def create_user(
 
 
 @router.post("/admin/users/{user_id}/send-reset")
-def send_password_reset(
-    user_id: uuid.UUID, principal: Principal = Admin, _: Principal = Depends(require_non_demo), ctx: RequestContext = Depends(get_ctx), db: Session = Depends(get_db)
-) -> dict[str, Any]:
+def send_password_reset(user_id: uuid.UUID, principal: Principal = ConsoleAdmin, ctx: RequestContext = Depends(get_console_ctx), db: Session = Depends(get_db)) -> dict[str, Any]:
     """Email the user a one-time link to choose a new password. Their current password keeps working until it is used."""
     user = db.execute(select(User).where(User.id == user_id, User.org_id == principal.org_id, User.removed_at.is_(None))).scalar_one_or_none()
     if user is None:
@@ -170,9 +166,8 @@ def send_password_reset(
 def update_user(
     user_id: uuid.UUID,
     body: UserUpdateIn,
-    principal: Principal = Admin,
-    _: Principal = Depends(require_non_demo),
-    ctx: RequestContext = Depends(get_ctx),
+    principal: Principal = ConsoleAdmin,
+    ctx: RequestContext = Depends(get_console_ctx),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     user = db.execute(select(User).where(User.id == user_id, User.org_id == principal.org_id, User.removed_at.is_(None))).scalar_one_or_none()
@@ -195,9 +190,7 @@ def update_user(
 
 
 @router.delete("/admin/users/{user_id}", status_code=204)
-def remove_user(
-    user_id: uuid.UUID, principal: Principal = Admin, _: Principal = Depends(require_non_demo), ctx: RequestContext = Depends(get_ctx), db: Session = Depends(get_db)
-) -> Response:
+def remove_user(user_id: uuid.UUID, principal: Principal = ConsoleAdmin, ctx: RequestContext = Depends(get_console_ctx), db: Session = Depends(get_db)) -> Response:
     """Remove an account: it can no longer sign in, disappears from user lists, and its email is freed.
 
     The row is kept (anonymised) because the audit log is append-only and incidents,
@@ -253,9 +246,7 @@ def list_sources(principal: Principal = Viewer, db: Session = Depends(get_db)) -
 
 
 @router.post("/data-sources", status_code=201)
-def create_source(
-    body: DataSourceCreateIn, principal: Principal = Admin, _: Principal = Depends(require_non_demo), ctx: RequestContext = Depends(get_ctx), db: Session = Depends(get_db)
-) -> dict[str, Any]:
+def create_source(body: DataSourceCreateIn, principal: Principal = ConsoleAdmin, ctx: RequestContext = Depends(get_console_ctx), db: Session = Depends(get_db)) -> dict[str, Any]:
     if db.execute(select(DataSource.id).where(DataSource.org_id == principal.org_id, DataSource.name == body.name)).scalar_one_or_none():
         raise HTTPException(status_code=409, detail="A data source with that name already exists")
     key = "sfk_" + new_token(32)
@@ -271,9 +262,7 @@ def create_source(
 
 
 @router.post("/data-sources/{source_id}/rotate-key")
-def rotate_key(
-    source_id: uuid.UUID, principal: Principal = Admin, _: Principal = Depends(require_non_demo), ctx: RequestContext = Depends(get_ctx), db: Session = Depends(get_db)
-) -> dict[str, Any]:
+def rotate_key(source_id: uuid.UUID, principal: Principal = ConsoleAdmin, ctx: RequestContext = Depends(get_console_ctx), db: Session = Depends(get_db)) -> dict[str, Any]:
     src = db.execute(select(DataSource).where(DataSource.id == source_id, DataSource.org_id == principal.org_id)).scalar_one_or_none()
     if src is None:
         raise HTTPException(status_code=404, detail="Data source not found")
@@ -285,9 +274,7 @@ def rotate_key(
 
 
 @router.post("/data-sources/{source_id}/revoke-key")
-def revoke_key(
-    source_id: uuid.UUID, principal: Principal = Admin, _: Principal = Depends(require_non_demo), ctx: RequestContext = Depends(get_ctx), db: Session = Depends(get_db)
-) -> dict[str, Any]:
+def revoke_key(source_id: uuid.UUID, principal: Principal = ConsoleAdmin, ctx: RequestContext = Depends(get_console_ctx), db: Session = Depends(get_db)) -> dict[str, Any]:
     """Invalidate the source's ingest key immediately. History is kept; rotate to issue a new key."""
     src = db.execute(select(DataSource).where(DataSource.id == source_id, DataSource.org_id == principal.org_id)).scalar_one_or_none()
     if src is None:
@@ -299,9 +286,7 @@ def revoke_key(
 
 
 @router.delete("/data-sources/{source_id}", status_code=204)
-def delete_source(
-    source_id: uuid.UUID, principal: Principal = Admin, _: Principal = Depends(require_non_demo), ctx: RequestContext = Depends(get_ctx), db: Session = Depends(get_db)
-) -> Response:
+def delete_source(source_id: uuid.UUID, principal: Principal = ConsoleAdmin, ctx: RequestContext = Depends(get_console_ctx), db: Session = Depends(get_db)) -> Response:
     """Delete a source that never received events. Sources with events keep their evidence; revoke the key instead."""
     src = db.execute(select(DataSource).where(DataSource.id == source_id, DataSource.org_id == principal.org_id)).scalar_one_or_none()
     if src is None:
@@ -439,6 +424,16 @@ def run_scenario(scenario_id: str, principal: Principal = Analyst, ctx: RequestC
 
 
 # --- settings / system ------------------------------------------------------------------
+
+
+@router.get("/admin/data-sources")
+def admin_list_sources(principal: Principal = ConsoleAdmin, db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+    return list_sources(principal, db)
+
+
+@router.get("/admin/system")
+def admin_system_info(principal: Principal = ConsoleAdmin, db: Session = Depends(get_db)) -> dict[str, Any]:
+    return system_info(principal, db)
 
 
 @router.get("/system")
