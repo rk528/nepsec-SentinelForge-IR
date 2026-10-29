@@ -118,7 +118,9 @@ def test_demo_seed_login_and_reset(app, db) -> None:
     assert summary["synthetic"] is True and summary["open_incidents"]["total"] >= 2
     assert summary["mtta"]["minutes"] is not None and summary["mtta"]["sample_size"] > 0
     # Demo accounts cannot perform administrative operations.
-    assert api.post("/api/v1/admin/users", json={"email": "x@y.test", "display_name": "X", "role": "admin", "password": "Strong-password-1"}).status_code == 401  # not signed in to the console
+    assert (
+        api.post("/api/v1/admin/users", json={"email": "x@y.test", "display_name": "X", "role": "admin", "password": "Strong-password-1"}).status_code == 401
+    )  # not signed in to the console
     # The seeded firewall block waits for a lead other than the requesting analyst.
     pending = api.get("/api/v1/response-actions", params={"status": ["pending_approval"]}).json()["items"]
     assert len(pending) == 1

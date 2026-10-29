@@ -64,7 +64,13 @@ def test_an_alert_raised_into_an_incident_brings_its_events(api_for) -> None:
 
 def test_links_go_every_way_between_incidents_alerts_and_events(api_for) -> None:
     admin = api_for("admin")
-    later = {"event_time": (datetime.now(UTC) - timedelta(minutes=5)).isoformat(), "event_type": "process.start", "host": "fin-ws-07", "user_name": "fin.user01", "process_name": "notepad.exe"}
+    later = {
+        "event_time": (datetime.now(UTC) - timedelta(minutes=5)).isoformat(),
+        "event_type": "process.start",
+        "host": "fin-ws-07",
+        "user_name": "fin.user01",
+        "process_name": "notepad.exe",
+    }
     ingest(admin.client, create_source(admin), [*brute_force_events(), later])
     analyst = api_for("analyst")
     detected = analyst.get("/api/v1/alerts").json()["items"][0]

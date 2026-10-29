@@ -15,7 +15,7 @@ from app.deps import Principal, client_ip, get_console_principal, get_ctx, get_p
 from app.models import Organization, PasswordResetToken, User, UserSession
 from app.schemas import DemoLoginIn, LoginIn, MeOut, NotificationPrefsIn, PasswordChangeIn, PasswordResetIn, PasswordTokenIn
 from app.security import hash_password, new_token, sha256_hex, validate_password_strength, verify_password
-from app.services import onboarding
+from app.services import console_gate, onboarding
 from app.services.demo import DEMO_SLUG, demo_org, seed_demo
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -99,6 +99,9 @@ def console_login(body: LoginIn, request: Request, response: Response, db: Sessi
     origin = (request.headers.get("origin") or "").rstrip("/")
     if not origin or origin not in settings.console_origin_list:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    # Not even a password is checked until the console has been unlocked with the owner's passkey.
+    if not console_gate.console_unlocked(request.cookies.get(console_gate.UNLOCK_COOKIE)):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=console_gate.LOCKED)
     ip = client_ip(request) or "unknown"
     ratelimit.hit(db, f"console-login:ip:{ip}", settings.login_rate_limit, settings.login_rate_window_seconds)
     ratelimit.hit(db, f"login:acct:{body.email.lower()}", settings.login_rate_limit, settings.login_rate_window_seconds)

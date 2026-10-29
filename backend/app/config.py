@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     # sign-in sets. Administration answers only to that cookie, which the app's own pages never hold.
     console_origins: str = ""
     console_cookie_name: str = "sf_console"
+    # Where the public key that signs the console's passkey unlock is published (NepSec Intel).
+    console_gate_key_url: str = "https://nepsecintel.kuinkel.com/api/console/gate/key"
 
     # Comma separated list of origins allowed to call the API directly (CORS).
     # The frontend normally reaches the API through a same-origin rewrite, so

@@ -46,6 +46,7 @@ for key in ("VIRUSTOTAL_API_KEY", "ABUSEIPDB_API_KEY", "OTX_API_KEY", "NEPSECINT
     os.environ.pop(key, None)
 
 from alembic.config import Config  # noqa: E402
+from cryptography.hazmat.primitives.asymmetric import ec  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import text  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
@@ -56,7 +57,14 @@ from app.db import get_sessionmaker  # noqa: E402
 from app.main import create_app  # noqa: E402
 from app.models import Organization, User  # noqa: E402
 from app.security import hash_password  # noqa: E402
+from app.services import console_gate  # noqa: E402
+from tests import helpers  # noqa: E402
 from tests.helpers import PASSWORD, Api  # noqa: E402
+
+# A key of the tests' own stands in for NepSec Intel's, so the console's passkey unlock can be signed here.
+helpers.UNLOCK_KEY = ec.generate_private_key(ec.SECP256R1())
+console_gate.set_key_for_tests(helpers.UNLOCK_KEY.public_key())
+console_gate.KEY_SECONDS = 10**9
 
 
 @pytest.fixture(scope="session", autouse=True)

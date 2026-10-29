@@ -13,6 +13,26 @@ CONSOLE = "https://console.test"
 CONSOLE_PATHS = ("/api/v1/admin/", "/api/v1/data-sources", "/api/v1/auth/console-logout")
 
 
+# The key the console's passkey unlock is signed with in tests, standing in for NepSec Intel's (see conftest).
+UNLOCK_KEY = None
+
+
+def unlock_token(expires_in: int = 3600) -> str:
+    """A passkey unlock as NepSec Intel signs it: payload.signature, ES256, the signature as raw r||s."""
+    import base64
+    import json
+    import time
+
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
+
+    b64 = lambda data: base64.urlsafe_b64encode(data).decode().rstrip("=")  # noqa: E731
+    payload = b64(json.dumps({"k": "gate", "c": "test", "iat": 0, "exp": int(time.time()) + expires_in}).encode())
+    r, s = decode_dss_signature(UNLOCK_KEY.sign(payload.encode(), ec.ECDSA(hashes.SHA256())))
+    return f"{payload}.{b64(r.to_bytes(32, 'big') + s.to_bytes(32, 'big'))}"
+
+
 class Api:
     """Thin TestClient wrapper that sends the CSRF header after login."""
 
@@ -42,7 +62,8 @@ class Api:
         return self.client.delete(url, headers=self._headers(headers, url), **kw)
 
     def console_login(self, email: str, password: str = PASSWORD) -> Api:
-        """Also sign in to the admin console, as an administrator does from its own address."""
+        """Also sign in to the admin console, as an administrator does from its own address, once it is unlocked."""
+        self.client.cookies.set("console_gate", unlock_token())
         r = self.client.post("/api/v1/auth/console-login", json={"email": email, "password": password}, headers={"Origin": CONSOLE})
         assert r.status_code == 200, r.text
         self.console_csrf = r.json()["csrf_token"]

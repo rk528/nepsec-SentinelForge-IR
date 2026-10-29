@@ -21,6 +21,7 @@ from app.config import get_settings
 from app.db import get_db
 from app.models import User, UserSession
 from app.security import constant_time_equals, role_at_least, sha256_hex
+from app.services import console_gate
 
 UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 # The only endpoints a user signed in with a temporary password may call.
@@ -62,6 +63,9 @@ def get_principal(request: Request, db: Session = Depends(get_db)) -> Principal:
 
 def get_console_principal(request: Request, db: Session = Depends(get_db)) -> Principal:
     """The administrator signed in to the admin console. The app's own session cookie does not count here."""
+    # The console must first be unlocked with the owner's passkey (checked against NepSec Intel's key).
+    if not console_gate.console_unlocked(request.cookies.get(console_gate.UNLOCK_COOKIE)):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=console_gate.LOCKED)
     principal = _principal(request, db, get_settings().console_cookie_name)
     if principal.role != "admin" or principal.is_demo:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Requires admin role")
